@@ -45,3 +45,15 @@ h2 { margin: 0 0 12px; font-size: 18px; display: flex; align-items: center; gap:
 .muted { color: var(--muted); }
 .small { font-size: 13px; margin: 12px 0 0; }
 .error { color: var(--down); }
+
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { padding: 8px 0; border-top: 1px solid var(--border); }
+a { color: inherit; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; align-items: center; }
+select, button { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--fg); }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.45; }
+button.primary { background: var(--ok); border-color: var(--ok); color: #fff; }
+.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; }
+.slot.open { border-color: var(--ok); }
+.slot.mine { background: var(--ok); color: #fff; opacity: 1; }
