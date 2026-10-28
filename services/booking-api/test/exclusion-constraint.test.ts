@@ -37,9 +37,10 @@ async function slot(doctor: string, range: string, status: 'open' | 'held' | 'bo
   const slotId = rows[0].id;
   if (status === 'held') {
     await client.query(
-      `UPDATE slots SET status = 'held', hold_id = gen_random_uuid(), hold_expires_at = now() + interval '5 minutes'
+      `UPDATE slots SET status = 'held', hold_id = gen_random_uuid(), hold_patient_id = $2,
+              hold_expires_at = now() + interval '5 minutes'
         WHERE id = $1`,
-      [slotId],
+      [slotId, patientId],
     );
   } else if (status === 'booked') {
     const appt = await client.query<{ id: string }>(
