@@ -16,10 +16,11 @@
     "db:migrate": "tsx db/migrate.ts",
     "db:seed": "tsx db/seed.ts",
     "db:materialize": "npm run materialize -w @ds/booking-api",
-    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w @ds/booking-api\" \"npm run dev -w @ds/web\"",
+    "dev": "concurrently -n api,web,workers -c blue,green,magenta \"npm run dev -w @ds/booking-api\" \"npm run dev -w @ds/web\" \"npm run dev -w @ds/workers\"",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json && npm run typecheck --workspaces --if-present",
-    "test": "vitest run"
+    "test": "vitest run",
+    "demo:race": "tsx scripts/race.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
