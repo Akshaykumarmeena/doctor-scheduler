@@ -25,6 +25,46 @@ export interface Slot {
   version: number;
 }
 
+/** A slot as shown to a patient: UTC instants plus the doctor's local wall-clock time. */
+export interface SlotView extends Slot {
+  localTime: string; // "09:15" in the doctor's tz
+}
+
+export interface Hold {
+  holdId: string;
+  slotId: string;
+  doctorId: string;
+  patientId: string;
+  expiresAt: string;
+}
+
+export type VisitType = 'in_person' | 'video';
+export type AppointmentStatus = 'confirmed' | 'cancelled' | 'completed' | 'no_show';
+
+export interface Appointment {
+  id: string;
+  slotId: string;
+  doctorId: string;
+  patientId: string;
+  visitType: VisitType;
+  status: AppointmentStatus;
+  start: string;
+  end: string;
+  createdAt: string;
+}
+
+export interface Patient {
+  id: string;
+  name: string;
+  phone: string;
+}
+
+/** Body of every 4xx/5xx response from booking-api. */
+export interface ApiError {
+  error: string;
+  message: string;
+}
+
 export type DependencyName = 'postgres' | 'redis' | 'redpanda' | 'opensearch';
 
 export interface DependencyHealth {
