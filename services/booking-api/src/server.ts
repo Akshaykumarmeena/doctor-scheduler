@@ -2,12 +2,15 @@ import { buildApp } from './app.js';
 import { config } from './config.js';
 import { createPool } from './db.js';
 import { createHealthChecker } from './health.js';
+import { startHoldSweeper } from './jobs/hold-sweeper.js';
 
 const pool = createPool(config.databaseUrl);
 const health = createHealthChecker({ pool, ...config });
 const app = await buildApp({ pool, health, webOrigin: config.webOrigin });
+const stopSweeper = startHoldSweeper(pool, 10_000, (msg) => app.log.info(msg));
 
 const shutdown = async () => {
+  stopSweeper();
   await app.close();
   await health.close();
   await pool.end();
