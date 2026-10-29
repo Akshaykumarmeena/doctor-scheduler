@@ -28,6 +28,14 @@ beforeEach(async () => {
 });
 afterEach(() => client.query('ROLLBACK'));
 
+/** A fresh patient per booking, so these doctor-overlap tests aren't tripped by the per-patient rule (Phase 4). */
+async function newPatient() {
+  const { rows } = await client.query<{ id: string }>(
+    `INSERT INTO patients (name, phone) VALUES ('Test Patient', '+91' || floor(random() * 1e10)::bigint) RETURNING id`,
+  );
+  return rows[0].id;
+}
+
 /** Inserts an open slot, then (optionally) books it through a real appointment row. */
 async function slot(doctor: string, range: string, status: 'open' | 'held' | 'booked' = 'open') {
   const { rows } = await client.query<{ id: string }>(
@@ -46,7 +54,7 @@ async function slot(doctor: string, range: string, status: 'open' | 'held' | 'bo
     const appt = await client.query<{ id: string }>(
       `INSERT INTO appointments (slot_id, doctor_id, patient_id, visit_type, idempotency_key)
        VALUES ($1, $2, $3, 'in_person', gen_random_uuid()::text) RETURNING id`,
-      [slotId, doctor, patientId],
+      [slotId, doctor, await newPatient()],
     );
     await client.query(`UPDATE slots SET status = 'booked', appointment_id = $2 WHERE id = $1`, [slotId, appt.rows[0].id]);
   }

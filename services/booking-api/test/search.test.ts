@@ -76,10 +76,14 @@ describe('search', () => {
     expect((await search(`date=${MONDAY}`)).results.map((r) => r.doctor.id)).toContain(ids.white);
 
     // Book both of Dr. Nair's Monday slots directly, then deliver the event the outbox relay would publish.
-    await pool.query(`INSERT INTO patients (name, phone) VALUES ('S', $1) ON CONFLICT DO NOTHING`, [`+9172${Date.now() % 1e8}`]);
-    const patient = (await pool.query<{ id: string }>('SELECT id FROM patients LIMIT 1')).rows[0].id;
     const slots = (await pool.query<{ id: string }>('SELECT id FROM slots WHERE doctor_id = $1', [ids.white])).rows;
     for (const s of slots) {
+      // Each booking gets its own patient: one patient can't be in two overlapping slots.
+      const patient = (
+        await pool.query<{ id: string }>(
+          `INSERT INTO patients (name, phone) VALUES ('Test Patient', '+91' || floor(random() * 1e10)::bigint) RETURNING id`,
+        )
+      ).rows[0].id;
       const a = await pool.query<{ id: string }>(
         `INSERT INTO appointments (slot_id, doctor_id, patient_id, visit_type, idempotency_key)
          VALUES ($1, $2, $3, 'in_person', gen_random_uuid()::text) RETURNING id`,

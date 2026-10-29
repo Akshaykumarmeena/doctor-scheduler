@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import type { Appointment, Doctor, Hold, SlotView } from '@ds/shared';
-import { api, ApiFailure } from '../../api';
+import type { Appointment, Doctor, Hold, SlotView, WaitlistEntry } from '@ds/shared';
+import { api, ApiFailure, API_URL } from '../../api';
 import { usePatient } from '../../patient';
 
 /** The next 14 calendar dates as YYYY-MM-DD in the doctor's time zone. */
@@ -16,8 +16,17 @@ function nextDates(tz: string) {
   });
 }
 
+const LEASE_SECONDS = 120;
+const HEARTBEAT_MS = 30_000;
+
+/** Plain-language messages for the errors a patient can actually cause. */
+const FRIENDLY: Record<string, string> = {
+  patient_busy: 'Busy: you already have an appointment (or a hold) at this time.',
+  too_many_holds: 'You are already holding 3 slots. Confirm or release one first.',
+};
+
 function errorText(err: unknown) {
-  if (err instanceof ApiFailure) return `${err.status} ${err.body.error}: ${err.body.message}`;
+  if (err instanceof ApiFailure) return FRIENDLY[err.body.error] ?? `${err.status} ${err.body.error}: ${err.body.message}`;
   return (err as Error).message;
 }
 
@@ -30,6 +39,8 @@ export function BookingPanel({ doctorId, initialDate }: { doctorId: string; init
   const [hold, setHold] = useState<Hold | null>(null);
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [live, setLive] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -50,10 +61,43 @@ export function BookingPanel({ doctorId, initialDate }: { doctorId: string; init
     loadSlots().catch((e) => setMessage(errorText(e)));
   }, [loadSlots]);
 
+  // Live: someone else holds, books or cancels on this day -> the server pushes "slots-changed" -> refetch.
+  useEffect(() => {
+    if (!date) return;
+    const es = new EventSource(`${API_URL}/doctors/${doctorId}/slots/stream?date=${date}`);
+    es.onopen = () => setLive(true);
+    es.onerror = () => setLive(false); // EventSource retries on its own
+    es.addEventListener('slots-changed', () => {
+      loadSlots().catch(() => {});
+    });
+    return () => es.close();
+  }, [doctorId, date, loadSlots]);
+
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Reopened tab: if this patient still has a live hold with this doctor, pick it back up.
+  useEffect(() => {
+    if (!patient) return;
+    api<{ holds: Hold[] }>(`/patients/${patient.id}/holds`)
+      .then((r) => setHold(r.holds.find((h) => h.doctorId === doctorId) ?? null))
+      .catch(() => {});
+  }, [patient, doctorId]);
+
+  // Closed-tab lease: while this page is open, renew the 2-minute lease every 30 s (up to the 5-minute deadline).
+  // Close the tab and the renewals stop, so the hold lapses within 2 minutes and the slot frees up.
+  const holdId = hold?.holdId;
+  useEffect(() => {
+    if (!holdId) return;
+    const beat = setInterval(() => {
+      api<Hold>(`/holds/${holdId}/heartbeat`, { method: 'POST', body: { leaseSeconds: LEASE_SECONDS }, idempotencyKey: crypto.randomUUID() })
+        .then(setHold)
+        .catch(() => {}); // lapsed: the countdown runs out and Confirm turns off
+    }, HEARTBEAT_MS);
+    return () => clearInterval(beat);
+  }, [holdId]);
 
   // Each user action gets its own idempotency key.
   async function act(fn: (key: string) => Promise<void>) {
@@ -78,7 +122,13 @@ export function BookingPanel({ doctorId, initialDate }: { doctorId: string; init
   const holdSlot = (slotId: string) =>
     act(async (key) => {
       setAppointment(null);
-      setHold(await api<Hold>('/holds', { method: 'POST', body: { slotId, patientId: patient!.id, durationMinutes: minutes }, idempotencyKey: key }));
+      setHold(
+        await api<Hold>('/holds', {
+          method: 'POST',
+          body: { slotId, patientId: patient!.id, durationMinutes: minutes, leaseSeconds: LEASE_SECONDS },
+          idempotencyKey: key,
+        }),
+      );
     });
   const release = () =>
     act(async (key) => {
@@ -91,16 +141,27 @@ export function BookingPanel({ doctorId, initialDate }: { doctorId: string; init
       setAppointment(appt);
       setHold(null);
     });
+  const joinWaitlist = () =>
+    act(async (key) => {
+      const entry = await api<WaitlistEntry>('/waitlist', {
+        method: 'POST',
+        body: { doctorId, patientId: patient!.id, date },
+        idempotencyKey: key,
+      });
+      setNotice(`You're on the waitlist for ${entry.date}. If a slot frees up, it's held for you and you'll get a message.`);
+    });
   const cancel = () =>
     act(async (key) => {
       setAppointment(await api<Appointment>(`/appointments/${appointment!.id}/cancel`, { method: 'POST', idempotencyKey: key }));
     });
 
   if (!doctor) return <p className="muted">{message ?? 'Loading…'}</p>;
-  const secondsLeft = hold ? Math.max(0, Math.round((new Date(hold.expiresAt).getTime() - now) / 1000)) : 0;
+  // The countdown shows the 5-minute deadline; the 2-minute lease only matters once the tab is closed.
+  const secondsLeft = hold ? Math.max(0, Math.round((new Date(hold.deadlineAt).getTime() - now) / 1000)) : 0;
   const fmt = new Intl.DateTimeFormat('en-IN', { timeZone: doctor.tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const timeOnly = new Intl.DateTimeFormat('en-IN', { timeZone: doctor.tz, hour: '2-digit', minute: '2-digit' });
   const span = (start: string, end: string) => `${fmt.format(new Date(start))}–${timeOnly.format(new Date(end))}`;
+  const nothingFree = slots.length > 0 && slots.every((s) => s.status !== 'open' || new Date(s.start).getTime() <= now);
   const heldIds = hold ? slots.filter((s) => s.start >= hold.start && s.end <= hold.end).map((s) => s.id) : [];
 
   return (
@@ -145,8 +206,16 @@ export function BookingPanel({ doctorId, initialDate }: { doctorId: string; init
           </div>
         )}
         <p className="muted small">
-          Times in {doctor.tz}. Grey = held, booked or past. {minutes === 30 && 'A 30-minute visit uses this slot and the next one.'}
+          Times in {doctor.tz}. Grey = held, booked or past. {minutes === 30 && 'A 30-minute visit uses this slot and the next one.'}{' '}
+          <span title="Updates from other patients appear without reloading">{live ? '● live' : '○ connecting…'}</span>
         </p>
+        {nothingFree && !hold && (
+          <div className="controls">
+            <span>Nothing free this day.</span>
+            <button onClick={joinWaitlist} disabled={!patient}>Join waitlist for this day</button>
+          </div>
+        )}
+        {notice && <p className="small">{notice}</p>}
       </section>
 
       {hold && (

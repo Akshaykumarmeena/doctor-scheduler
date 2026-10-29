@@ -33,11 +33,16 @@ export interface EventMessage {
   value: string | null;
 }
 
-/** Handles one Kafka batch: every distinct doctor mentioned gets its document rebuilt once. */
+/**
+ * Handles one Kafka batch: every distinct doctor mentioned gets its document rebuilt once.
+ * hold.* events are skipped: holds are not indexed (ADR 0003), so they can't change a document.
+ */
 export async function handleEvents(pool: pg.Pool, osUrl: string, index: string, messages: EventMessage[]): Promise<number> {
   const doctorIds = new Set<string>();
   for (const m of messages) {
-    const doctorId = m.key ?? (m.value ? (JSON.parse(m.value) as { doctorId?: string }).doctorId : undefined);
+    const event = m.value ? (JSON.parse(m.value) as { doctorId?: string; eventType?: string }) : {};
+    if (event.eventType?.startsWith('hold.')) continue;
+    const doctorId = m.key ?? event.doctorId;
     if (doctorId) doctorIds.add(doctorId);
   }
   if (doctorIds.size === 0) return 0;

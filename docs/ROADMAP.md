@@ -18,8 +18,8 @@ Agreed with Akshay on 2026-10-28. One phase = one PR, merged into `main` before 
 | --- | --- | --- | --- |
 | 1 | Foundations | merged (PR #1) | Schema review of `slots` + EXCLUDE, explain-back (review) |
 | 2 | Booking | merged (PR #2) | `confirm.ts`, the confirm transaction (C) |
-| 3 | Patient app + search + 30-minute visits | in review (PR #3) | Search query builder (C) |
-| 4 | Events | planned | tbd |
+| 3 | Patient app + search + 30-minute visits | merged (PR #3) | Search query builder (C) |
+| 4 | Events | in review | Waitlist matcher: pick next + offer (C) |
 | 5 | Doctor app | planned | tbd |
 | 6 | Engineering console | planned | tbd |
 | 7 | Demo kit | planned | tbd |
@@ -51,12 +51,46 @@ Race button, stop/start services, live event stream, k6 load test with a rolling
 A public link through Cloudflare Tunnel, a demo script, and an interview pack: architecture diagram, capacity
 estimates, trade-offs.
 
+## Backlog (not yet scheduled)
+
+- **Reviews + fair rating** (added 2026-10-29 at Akshay's request; phase to be decided). A reviews table that only
+  accepts a review for a completed appointment (one per appointment). `doctors.rating_avg` / `rating_count` are
+  updated in the same transaction, with an outbox event `doctor.rating_changed` that the search indexer already
+  handles (it re-reads the doctor). Ranking uses a Bayesian average, `(C·m + Σstars) / (C + n)`, so a 5.0 from
+  2 reviews doesn't beat a 4.7 from 800, and new doctors start at the global mean.
+
 ## Changes vs plan
 
 Newest first. Each entry: what changed from the approved plan, why, and whether Akshay approved it **before**
 (asked) or **after** (reported) the change.
 
-### Phase 3 (this PR)
+### Phase 4 (this PR)
+- **Added at Akshay's request (asked, approved 2026-10-29):** closed-tab leases (2-minute lease renewed by
+  heartbeats under a 5-minute deadline; `POST /holds/:id/heartbeat`, `GET /patients/:id/holds`, `leaseSeconds` on
+  `POST /holds`) and per-patient overlap (schema 0011: EXCLUDE on held slots by patient, `appointments.during` +
+  EXCLUDE by patient, max 3 live holds). ADR 0007.
+- **Phase 1 test fixture** (`exclusion-constraint.test.ts` books every slot for ONE patient, which the new
+  per-patient rule now correctly rejects): each booking now gets its own patient. Asked; approved.
+- **Phase 3 test fixture** (`search.test.ts`, "an appointment event updates the read model") booked with an
+  arbitrary existing patient (`SELECT id FROM patients LIMIT 1`). In CI's file order that patient already had a
+  confirmed appointment at the same time, so the per-patient rule refused it and CI failed (68/69). Each booking
+  now gets its own patient (commit 57487b6, no assertion changes). Done at Akshay's request ("fix it").
+- **Waitlist doctor names:** option (b) chosen (the page fetches each doctor). Asked.
+- **Built before asking (found by the plan-vs-build check; Akshay approved all four after the fact):**
+  1. `idempotency.ts` (not in the "existing files touched" list) gained a shared `sendIdempotent` route helper, so
+     the new waitlist and notification routes reuse the Idempotency-Key wrapper that lived inside
+     `routes/booking.ts`.
+  2. Leaving the waitlist while an offer is open also releases that offer's hold (so the slot moves on at once).
+  3. The matcher offers a slot on ANY `hold.released` / `hold.expired`, not only those of waitlist offers (any
+     lapsed hold is a freed slot).
+  4. The matcher lives at `workers/src/waitlist/matcher.ts` (plus `booking-api-client.ts`), not
+     `workers/src/waitlist-matcher.ts`. Other new helper files: `booking/hold-events.ts`, `waitlist.ts`,
+     `notifications.ts`, `live/hub.ts`, `workers/src/{events,notify}.ts`.
+- *Fixed during build (inside planned files):* the SSE stream announced `: connected` before its Redis
+  subscription was active (a lost-message race); it now subscribes first and cleans up if the browser leaves
+  mid-subscribe.
+
+### Phase 3 (PR #3)
 - **30-minute storage: Option 1 ("merge row")**, chosen by Akshay from two options before coding. Asked.
 - **`/search` takes `lat`, `lng`, `radiusKm`, not `near=<area>`.** The plan listed both forms; only the point
   form was built, and the search page turns the chosen area into its centre point. Reported after; approved.

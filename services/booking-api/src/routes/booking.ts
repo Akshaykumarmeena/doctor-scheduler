@@ -1,9 +1,19 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { VisitType } from '@ds/shared';
 import type { Pool } from '../db.js';
 import { notFound } from '../errors.js';
-import { requestHash, requireKey, withIdempotency, type Tx } from '../idempotency.js';
-import { VISIT_MINUTES, createHold, releaseHold, type VisitMinutes } from '../booking/holds.js';
+import { sendIdempotent } from '../idempotency.js';
+import {
+  HOLD_LEASE_RANGE,
+  HOLD_TTL_RANGE,
+  VISIT_MINUTES,
+  createHold,
+  heartbeatHold,
+  liveHoldsForPatient,
+  releaseHold,
+  type VisitMinutes,
+} from '../booking/holds.js';
+import { conflict } from '../errors.js';
 import { confirmHold } from '../booking/confirm.js';
 import { cancelAppointment } from '../booking/cancel.js';
 import { appointmentsForPatient, getAppointment, getDoctor, listPatients, slotsForDay } from '../booking/queries.js';
@@ -12,20 +22,7 @@ const uuid = { type: 'string', format: 'uuid' } as const;
 const idParams = { type: 'object', required: ['id'], properties: { id: uuid } } as const;
 
 export function registerBookingRoutes(app: FastifyInstance, pool: Pool) {
-  /** Every write goes through here: Idempotency-Key required, one transaction, stored response. */
-  async function idempotent(
-    req: FastifyRequest,
-    reply: FastifyReply,
-    successCode: number,
-    handler: (tx: Tx, key: string) => Promise<unknown>,
-  ) {
-    const key = requireKey(req.headers['idempotency-key']);
-    const result = await withIdempotency(pool, key, requestHash(req.method, req.url, req.body), async (tx) => ({
-      statusCode: successCode,
-      body: await handler(tx, key),
-    }));
-    return reply.code(result.statusCode).header('idempotent-replayed', String(result.replayed)).send(result.body);
-  }
+  const idempotent = sendIdempotent(pool);
 
   // ── reads ──────────────────────────────────────────────────────────────────
   app.get<{ Params: { id: string } }>('/doctors/:id', { schema: { params: idParams } }, async (req) => {
@@ -62,7 +59,9 @@ export function registerBookingRoutes(app: FastifyInstance, pool: Pool) {
   }));
 
   // ── writes (idempotent) ────────────────────────────────────────────────────
-  app.post<{ Body: { slotId: string; patientId: string; durationMinutes?: VisitMinutes } }>(
+  app.post<{
+    Body: { slotId: string; patientId: string; durationMinutes?: VisitMinutes; ttlSeconds?: number; leaseSeconds?: number };
+  }>(
     '/holds',
     {
       schema: {
@@ -70,12 +69,37 @@ export function registerBookingRoutes(app: FastifyInstance, pool: Pool) {
           type: 'object',
           required: ['slotId', 'patientId'],
           additionalProperties: false,
-          properties: { slotId: uuid, patientId: uuid, durationMinutes: { type: 'integer', enum: [...VISIT_MINUTES] } },
+          properties: {
+            slotId: uuid,
+            patientId: uuid,
+            durationMinutes: { type: 'integer', enum: [...VISIT_MINUTES] },
+            ttlSeconds: { type: 'integer', minimum: HOLD_TTL_RANGE.min, maximum: HOLD_TTL_RANGE.max },
+            leaseSeconds: { type: 'integer', minimum: HOLD_LEASE_RANGE.min, maximum: HOLD_LEASE_RANGE.max },
+          },
         },
       },
     },
     (req, reply) => idempotent(req, reply, 201, (tx) => createHold(tx, req.body)),
   );
+
+  app.post<{ Params: { id: string }; Body: { leaseSeconds?: number } | undefined }>(
+    '/holds/:id/heartbeat',
+    {
+      schema: {
+        params: idParams,
+        body: {
+          type: ['object', 'null'],
+          additionalProperties: false,
+          properties: { leaseSeconds: { type: 'integer', minimum: HOLD_LEASE_RANGE.min, maximum: HOLD_LEASE_RANGE.max } },
+        },
+      },
+    },
+    (req, reply) => idempotent(req, reply, 200, (tx) => heartbeatHold(tx, req.params.id, req.body?.leaseSeconds ?? 120)),
+  );
+
+  app.get<{ Params: { id: string } }>('/patients/:id/holds', { schema: { params: idParams } }, async (req) => ({
+    holds: await liveHoldsForPatient(pool, req.params.id),
+  }));
 
   app.delete<{ Params: { id: string } }>('/holds/:id', { schema: { params: idParams } }, (req, reply) =>
     idempotent(req, reply, 200, (tx) => releaseHold(tx, req.params.id)),
@@ -93,7 +117,16 @@ export function registerBookingRoutes(app: FastifyInstance, pool: Pool) {
         },
       },
     },
-    (req, reply) => idempotent(req, reply, 201, (tx, key) => confirmHold(tx, { ...req.body, idempotencyKey: key })),
+    (req, reply) =>
+      idempotent(req, reply, 201, (tx, key) =>
+        confirmHold(tx, { ...req.body, idempotencyKey: key }).catch((err: { code?: string; constraint?: string }) => {
+          // The patient already has a confirmed appointment overlapping this one (any doctor).
+          if (err.code === '23P01' && err.constraint === 'appointments_patient_no_overlap') {
+            throw conflict('patient_busy', 'You already have an appointment at this time');
+          }
+          throw err;
+        }),
+      ),
   );
 
   app.post<{ Params: { id: string } }>('/appointments/:id/cancel', { schema: { params: idParams } }, (req, reply) =>
