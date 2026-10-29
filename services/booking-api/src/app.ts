@@ -10,6 +10,7 @@ import { registerSearchRoutes } from './routes/search.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerWaitlistRoutes } from './routes/waitlist.js';
 import { registerStreamRoutes } from './routes/stream.js';
+import { registerDoctorAppRoutes } from './routes/doctor.js';
 import type { LiveHub } from './live/hub.js';
 import { config } from './config.js';
 
@@ -28,7 +29,7 @@ export async function buildApp(deps: AppDeps) {
   const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' } });
   await app.register(cors, {
     origin: deps.webOrigin,
-    methods: ['GET', 'POST', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['content-type', 'idempotency-key'],
     exposedHeaders: ['idempotent-replayed'],
   });
@@ -52,6 +53,7 @@ export async function buildApp(deps: AppDeps) {
   });
   registerNotificationRoutes(app, deps.pool);
   registerWaitlistRoutes(app, deps.pool);
+  registerDoctorAppRoutes(app, deps.pool);
   if (deps.hub) registerStreamRoutes(app, { pool: deps.pool, hub: deps.hub, webOrigin: deps.webOrigin });
   return app;
 }
