@@ -19,6 +19,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <Link href="/search">Find a doctor</Link>
               <Link href="/me/appointments">My appointments</Link>
               <InboxLink />
+              <Link href="/doctor/week">Doctor app</Link>
             </nav>
             <PatientSwitcher />
           </header>
