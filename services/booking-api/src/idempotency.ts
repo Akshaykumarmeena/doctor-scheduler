@@ -10,6 +10,7 @@
 // row (unique index), then sees the committed row and replays it. If the first rolls back, the second
 // proceeds as the owner. No "in progress" state is ever visible.
 import { createHash } from 'node:crypto';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import type { Pool } from './db.js';
 import { HttpError, badRequest, unprocessable } from './errors.js';
@@ -87,4 +88,16 @@ export async function withIdempotency(
   } finally {
     tx.release();
   }
+}
+
+/** Route helper: every write goes through here (Idempotency-Key required, one transaction, stored response). */
+export function sendIdempotent(pool: Pool) {
+  return async (req: FastifyRequest, reply: FastifyReply, successCode: number, handler: (tx: Tx, key: string) => Promise<unknown>) => {
+    const key = requireKey(req.headers['idempotency-key']);
+    const result = await withIdempotency(pool, key, requestHash(req.method, req.url, req.body), async (tx) => ({
+      statusCode: successCode,
+      body: await handler(tx, key),
+    }));
+    return reply.code(result.statusCode).header('idempotent-replayed', String(result.replayed)).send(result.body);
+  };
 }
