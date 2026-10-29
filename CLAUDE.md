@@ -21,6 +21,9 @@ Phase 2: holds (5-min TTL), confirm, cancel, idempotency keys, transactional out
 hold sweeper (inside booking-api), booking UI.
 Phase 3: OpenSearch search read model fed by the `search-indexer` consumer group, `/search` API and page, patient
 screens (search, slot grid with countdown, My appointments), 30-minute visits as composite slot rows (ADR 0004).
+Phase 4: hold.* events, live slot updates (live-fanout → Redis → SSE), patient inbox (notifier), waitlist offers
+(waitlist-matcher holds freed slots for the next patient through booking-api, cascading), reminders,
+closed-tab hold leases (heartbeat), and per-patient overlap guards (a patient can't be in two places at once).
 The full plan and the "changes vs plan" log are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Invariants (do not break these)
@@ -36,6 +39,7 @@ The full plan and the "changes vs plan" log are in [docs/ROADMAP.md](docs/ROADMA
 Also: every booking table carries `doctor_id` (future shard key and Kafka partition key), and events leave the
 database only through the transactional `outbox`.
 
+Per patient, `slots_patient_no_overlapping_holds` and `appointments_patient_no_overlap` do the same (ADR 0007).
 The double-booking guard is the `slots_no_overlapping_commitments` EXCLUDE constraint
 (`doctor_id WITH =, during WITH &&` for `held`/`booked`). Do not weaken or drop it.
 
@@ -57,7 +61,8 @@ The double-booking guard is the `slots_no_overlapping_commitments` EXCLUDE const
 | `npm run db:seed` | Insert ~5,000 doctors, templates, ~300 patients (idempotent: skips if seeded) |
 | `npm run db:materialize` | Expand templates minus exceptions into slots for the next 14 days (safe to re-run) |
 | `npm run search:reindex` | Rebuild the OpenSearch `doctors` index from Postgres and swap the alias (run after materialize) |
-| `npm run dev` | booking-api on :4000, web on :3000, workers (outbox relay + search indexer) |
+| `npm run dev` | booking-api on :4000, web on :3000, workers (relay, search-indexer, live-fanout, notifier, waitlist-matcher, reminders) |
+| `OFFER_TTL_SECONDS=60 REMINDER_LEAD_MINUTES=10,2 npm run dev` | Same, with fast waitlist offers and reminders for a demo |
 | `npm run demo:race [-- --naive]` | 100 patients race for one slot (API mode needs `npm run dev`) |
 | `npm run lint` / `npm run typecheck` / `npm test` | Checks; tests use a throwaway `scheduler_test` DB |
 
@@ -69,7 +74,8 @@ OpenSearch http://localhost:9200
 - **Akshay writes the critical piece of each phase himself.** Claude scaffolds around it, explains, and reviews,
   but does not write that piece unless Akshay asks. (Phase 1: the schema review of `slots` + EXCLUDE.
   Phase 2: `services/booking-api/src/booking/confirm.ts`, the confirm transaction.
-  Phase 3: `services/booking-api/src/search/query.ts`, the search query builder.)
+  Phase 3: `services/booking-api/src/search/query.ts`, the search query builder.
+  Phase 4: `services/workers/src/waitlist/matcher.ts`, the waitlist matcher's pick-and-offer step.)
 - Show a plan before multi-file changes; small commits, one logical change each; never push without Akshay's OK.
 - **Ask before deviating from an approved plan**, and add every deviation to the "Changes vs plan" log in
   `docs/ROADMAP.md`. Every PR updates that log.
