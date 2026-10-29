@@ -70,7 +70,11 @@ Newest first. Each entry: what changed from the approved plan, why, and whether 
   `POST /holds`) and per-patient overlap (schema 0011: EXCLUDE on held slots by patient, `appointments.during` +
   EXCLUDE by patient, max 3 live holds). ADR 0007.
 - **Phase 1 test fixture** (`exclusion-constraint.test.ts` books every slot for ONE patient, which the new
-  per-patient rule now correctly rejects): proposed giving each booking its own patient. Asked; awaiting approval.
+  per-patient rule now correctly rejects): each booking now gets its own patient. Asked; approved.
+- **Phase 3 test fixture** (`search.test.ts`, "an appointment event updates the read model") booked with an
+  arbitrary existing patient (`SELECT id FROM patients LIMIT 1`). In CI's file order that patient already had a
+  confirmed appointment at the same time, so the per-patient rule refused it and CI failed (68/69). Each booking
+  now gets its own patient (commit 57487b6, no assertion changes). Done at Akshay's request ("fix it").
 - **Waitlist doctor names:** option (b) chosen (the page fetches each doctor). Asked.
 - **Built before asking (found by the plan-vs-build check; Akshay approved all four after the fact):**
   1. `idempotency.ts` (not in the "existing files touched" list) gained a shared `sendIdempotent` route helper, so
