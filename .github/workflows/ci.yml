@@ -19,8 +19,20 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U scheduler -d scheduler"
           --health-interval 5s --health-timeout 3s --health-retries 20
+      opensearch:
+        image: opensearchproject/opensearch:2.17.1
+        env:
+          discovery.type: single-node
+          DISABLE_SECURITY_PLUGIN: "true"
+          DISABLE_INSTALL_DEMO_CONFIG: "true"
+          OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+        ports: ["9200:9200"]
+        options: >-
+          --health-cmd "curl -fs http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 10s --health-timeout 5s --health-retries 30
     env:
       DATABASE_URL: postgres://scheduler:scheduler@localhost:5432/scheduler
+      OPENSEARCH_URL: http://localhost:9200
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
