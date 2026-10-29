@@ -20,8 +20,8 @@ Agreed with Akshay on 2026-10-28. One phase = one PR, merged into `main` before 
 | 2 | Booking | merged (PR #2) | `confirm.ts`, the confirm transaction (C) |
 | 3 | Patient app + search + 30-minute visits | merged (PR #3) | Search query builder (C) |
 | 4 | Events | merged (PR #4) | Waitlist matcher: pick next + offer (C) |
-| 5 | Doctor app | in review | Time-off transaction (C) |
-| 6 | Engineering console | planned | tbd |
+| 5 | Doctor app | merged (PR #5) | Time-off transaction (C) |
+| 6 | Engineering console | in review | Graceful shutdown + retry policy (C) |
 | 7 | Demo kit | planned | tbd |
 
 ### 1. Foundations (done)
@@ -64,7 +64,22 @@ estimates, trade-offs.
 Newest first. Each entry: what changed from the approved plan, why, and whether Akshay approved it **before**
 (asked) or **after** (reported) the change.
 
-### Phase 5 (this PR)
+### Phase 6 (this PR)
+- **Decisions before building (asked):** separate dev-only ops service · k6 via Docker (`grafana/k6:0.54.0`) ·
+  cluster setup (2 APIs + nginx, `npm run dev:cluster`, graceful shutdown in `server.ts`) · mode C for graceful
+  shutdown + retry policy · no extra console wishes.
+- **Found by the first load test, fixed (inside planned files, reported):** nginx sent some requests to an
+  unreachable IPv6 address of `host.docker.internal` (5% errors). Now a small start-up script
+  (`infra/nginx/resolve-api-host.sh`, new file) writes the Mac's IPv4 into the config. The k6 script sent
+  `content-type: application/json` with an empty cancel body (all cancels failed): fixed in the script.
+- **Found by the load test, then fixed (asked; Akshay delegated: "go with your best decision"):** booking-api's
+  error handler turned Fastify's own 4xx errors (e.g. "body cannot be empty", malformed JSON) into 500. Pre-existing
+  since Phase 2. `app.ts` now keeps the 4xx; new test `errors.test.ts`.
+- *Small additions, reported:* a "Console" link in the header; `loadtest/vendor.js` (a 3-line helper);
+  `loadtest/out/` in `.gitignore`; the race lives in `services/ops/src/race.ts` (`scripts/race.ts` unchanged).
+  A `dev:ops` script was written and removed again before reporting (not in the plan).
+
+### Phase 5 (PR #5)
 - **Decisions before building (asked):** 1a keep and flag bookings when hours shrink · 2a time off cancels and
   notifies after a preview · 3 add Done / No-show · 4 slots stay 15 min · 5 mode C for the time-off transaction ·
   6 "reviews + fair rating" stays in the backlog.
