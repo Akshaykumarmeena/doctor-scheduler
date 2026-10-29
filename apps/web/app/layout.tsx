@@ -20,6 +20,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <Link href="/me/appointments">My appointments</Link>
               <InboxLink />
               <Link href="/doctor/week">Doctor app</Link>
+              <Link href="/console">Console</Link>
             </nav>
             <PatientSwitcher />
           </header>
