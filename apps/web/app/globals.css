@@ -78,3 +78,7 @@ h2 { margin-top: 24px; }
   .result { flex-direction: column; align-items: flex-start; }
   .result .next { text-align: left; }
 }
+
+.badge.count { margin-left: 6px; }
+.result.read { opacity: 0.7; }
+.offer { border-color: var(--ok); }
