@@ -18,7 +18,7 @@ Agreed with Akshay on 2026-10-28. One phase = one PR, merged into `main` before 
 | --- | --- | --- | --- |
 | 1 | Foundations | merged (PR #1) | Schema review of `slots` + EXCLUDE, explain-back (review) |
 | 2 | Booking | merged (PR #2) | `confirm.ts`, the confirm transaction (C) |
-| 3 | Patient app + search + 30-minute visits | in progress | Search query builder (C) |
+| 3 | Patient app + search + 30-minute visits | in review (PR #3) | Search query builder (C) |
 | 4 | Events | planned | tbd |
 | 5 | Doctor app | planned | tbd |
 | 6 | Engineering console | planned | tbd |
@@ -56,8 +56,20 @@ estimates, trade-offs.
 Newest first. Each entry: what changed from the approved plan, why, and whether Akshay approved it **before**
 (asked) or **after** (reported) the change.
 
-### Phase 3
-- *(none yet)*
+### Phase 3 (this PR)
+- **30-minute storage: Option 1 ("merge row")**, chosen by Akshay from two options before coding. Asked.
+- **`/search` takes `lat`, `lng`, `radiusKm`, not `near=<area>`.** The plan listed both forms; only the point
+  form was built, and the search page turns the chosen area into its centre point. Reported after; approved.
+- **Added `GET /search/facets`** (specialties, languages, areas with centre points, from Postgres) for the search
+  page's filters. Not named in the plan. Reported after; approved.
+- **Hold responses now include `start` and `end`**, so the UI can show a 30-minute hold's span. Reported after; approved.
+- **The indexer builds the index on start-up if the alias is missing** (self-healing first run). Reported after; approved.
+- The four "reported after" items above are small additions inside the approved scope, but under the new rule
+  they should have been asked first. Akshay approved all four. The fix agreed for future phases: a strict
+  definition of "deviation", stop-and-ask, and a check of the built changes against the plan before every report.
+- *Fixed during live verification (not scope changes):* free-text search now matches by prefix OR typo
+  (`bool_prefix` + fuzzy), so search-as-you-type works ("cardio" found 0, now 332). The search-box placeholder no
+  longer suggests "skin", because there are no synonyms.
 
 ### Phase 2 (PR #2)
 - **Scope source:** the planning brief said only "booking endpoints". Claude wrote the Phase 2 scope and Akshay

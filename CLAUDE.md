@@ -18,7 +18,10 @@ apps/web (Next.js)  ──HTTP──▶  services/booking-api (Fastify, plain SQ
 
 Phase 1: infra, schema, seed, slot materializer, `/health`, `/doctors`.
 Phase 2: holds (5-min TTL), confirm, cancel, idempotency keys, transactional outbox + relay to Redpanda,
-hold sweeper (inside booking-api), booking UI. Single-slot bookings only; 30-min visits are Phase 3.
+hold sweeper (inside booking-api), booking UI.
+Phase 3: OpenSearch search read model fed by the `search-indexer` consumer group, `/search` API and page, patient
+screens (search, slot grid with countdown, My appointments), 30-minute visits as composite slot rows (ADR 0004).
+The full plan and the "changes vs plan" log are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Invariants (do not break these)
 
@@ -53,7 +56,8 @@ The double-booking guard is the `slots_no_overlapping_commitments` EXCLUDE const
 | `npm run db:migrate` | Apply new schema files to `DATABASE_URL` |
 | `npm run db:seed` | Insert ~5,000 doctors, templates, ~300 patients (idempotent: skips if seeded) |
 | `npm run db:materialize` | Expand templates minus exceptions into slots for the next 14 days (safe to re-run) |
-| `npm run dev` | booking-api on :4000, web on :3000, workers (outbox relay) |
+| `npm run search:reindex` | Rebuild the OpenSearch `doctors` index from Postgres and swap the alias (run after materialize) |
+| `npm run dev` | booking-api on :4000, web on :3000, workers (outbox relay + search indexer) |
 | `npm run demo:race [-- --naive]` | 100 patients race for one slot (API mode needs `npm run dev`) |
 | `npm run lint` / `npm run typecheck` / `npm test` | Checks; tests use a throwaway `scheduler_test` DB |
 
@@ -64,7 +68,10 @@ OpenSearch http://localhost:9200
 
 - **Akshay writes the critical piece of each phase himself.** Claude scaffolds around it, explains, and reviews,
   but does not write that piece unless Akshay asks. (Phase 1: the schema review of `slots` + EXCLUDE.
-  Phase 2: `services/booking-api/src/booking/confirm.ts`, the confirm transaction.)
+  Phase 2: `services/booking-api/src/booking/confirm.ts`, the confirm transaction.
+  Phase 3: `services/booking-api/src/search/query.ts`, the search query builder.)
 - Show a plan before multi-file changes; small commits, one logical change each; never push without Akshay's OK.
+- **Ask before deviating from an approved plan**, and add every deviation to the "Changes vs plan" log in
+  `docs/ROADMAP.md`. Every PR updates that log.
 - Plain SQL only. If a query matters, it should be readable in the code.
 - Zero spend: everything runs locally in Docker; no paid or cloud services.
