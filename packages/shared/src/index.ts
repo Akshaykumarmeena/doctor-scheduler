@@ -177,3 +177,74 @@ export interface LiveSlotEvent {
   end: string | null;
   at: string;
 }
+
+// ── Phase 5: doctor app ─────────────────────────────────────────────────────
+
+export interface WeekSlotAppointment {
+  id: string;
+  patientName: string;
+  visitType: VisitType;
+  minutes: number;
+  status: AppointmentStatus;
+  /** false on the second 15-minute row of a 30-minute visit (draw it as one block). */
+  startsHere: boolean;
+}
+
+export interface WeekSlot {
+  id: string;
+  start: string;
+  end: string;
+  localTime: string;
+  status: SlotStatus;
+  blockedReason: 'hours' | 'time_off' | null;
+  appointment: WeekSlotAppointment | null;
+  /** A booking kept after the doctor removed these hours (decision 1a): show it, flagged. */
+  outsideHours: boolean;
+}
+
+export interface WeekView {
+  doctorId: string;
+  tz: string;
+  days: { date: string; slots: WeekSlot[] }[];
+}
+
+export interface WorkingHours {
+  /** Set on rules read back from the server; omit when sending a new set. */
+  id?: string;
+  weekday: number; // ISO: 1 = Monday
+  startLocal: string; // "09:00"
+  endLocal: string; // "13:00"
+}
+
+export type TimeOffKind = 'leave' | 'holiday' | 'blocked';
+
+export interface TimeOff {
+  id: string;
+  start: string;
+  end: string;
+  kind: TimeOffKind;
+  reason: string | null;
+}
+
+export interface AffectedAppointment {
+  id: string;
+  patientName: string;
+  start: string;
+  end: string;
+}
+
+export interface DoctorStats {
+  from: string;
+  to: string;
+  offeredMinutes: number;
+  bookedMinutes: number;
+  utilizationPct: number;
+  appointments: number;
+  cancellations: number;
+  cancellationRatePct: number;
+  noShows: number;
+  noShowRatePct: number;
+  avgLeadTimeHours: number | null;
+  waitlistWaiting: number;
+  byDay: { date: string; offeredMinutes: number; bookedMinutes: number }[];
+}
