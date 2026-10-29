@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "reindex": "tsx src/search/reindex-cli.ts"
   },
   "dependencies": {
     "kafkajs": "^2.2.4",

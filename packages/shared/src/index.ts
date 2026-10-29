@@ -36,6 +36,9 @@ export interface Hold {
   doctorId: string;
   patientId: string;
   expiresAt: string;
+  /** The held time: 15 or 30 minutes from the chosen slot. */
+  start: string;
+  end: string;
 }
 
 export type VisitType = 'in_person' | 'video';
@@ -51,6 +54,15 @@ export interface Appointment {
   start: string;
   end: string;
   createdAt: string;
+}
+
+/** An appointment with the doctor details a patient needs to recognise it ("My appointments"). */
+export interface PatientAppointment extends Appointment {
+  doctorName: string;
+  specialty: string;
+  clinic: string;
+  area: string;
+  tz: string;
 }
 
 export interface Patient {
@@ -77,4 +89,43 @@ export interface HealthReport {
   ok: boolean;
   checkedAt: string;
   dependencies: Record<DependencyName, DependencyHealth>;
+}
+
+export type SearchSort = 'relevance' | 'distance' | 'rating' | 'soonest';
+
+export interface SearchParams {
+  q?: string;
+  specialty?: string;
+  area?: string;
+  language?: string;
+  /** Local date YYYY-MM-DD: only doctors with a free slot that day. */
+  date?: string;
+  /** "Near me": a point and a radius. */
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
+  sort?: SearchSort;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface SearchResult {
+  doctor: Doctor;
+  nextAvailable: string | null;
+  availableDates: string[];
+  openSlots: number;
+  distanceKm: number | null;
+  score: number | null;
+}
+
+export interface SearchResponse {
+  total: number;
+  tookMs: number;
+  results: SearchResult[];
+}
+
+export interface SearchFacets {
+  specialties: string[];
+  languages: string[];
+  areas: { name: string; lat: number; lng: number }[];
 }

@@ -6,11 +6,16 @@ import type { HealthChecker } from './health.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerDoctorRoutes } from './routes/doctors.js';
 import { registerBookingRoutes } from './routes/booking.js';
+import { registerSearchRoutes } from './routes/search.js';
+import { config } from './config.js';
 
 export interface AppDeps {
   pool: Pool;
   health: HealthChecker;
   webOrigin: string;
+  /** Where search reads from; defaults to config (OPENSEARCH_URL, alias "doctors"). */
+  opensearchUrl?: string;
+  searchIndex?: string;
 }
 
 export async function buildApp(deps: AppDeps) {
@@ -34,5 +39,10 @@ export async function buildApp(deps: AppDeps) {
   registerHealthRoutes(app, deps.health);
   registerDoctorRoutes(app, deps.pool);
   registerBookingRoutes(app, deps.pool);
+  registerSearchRoutes(app, {
+    pool: deps.pool,
+    opensearchUrl: deps.opensearchUrl ?? config.opensearchUrl,
+    searchIndex: deps.searchIndex ?? config.searchIndex,
+  });
   return app;
 }

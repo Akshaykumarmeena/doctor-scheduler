@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import type { Appointment, Doctor, Hold, Patient, SlotView } from '@ds/shared';
+import type { Appointment, Doctor, Hold, SlotView } from '@ds/shared';
 import { api, ApiFailure } from '../../api';
+import { usePatient } from '../../patient';
 
 /** The next 14 calendar dates as YYYY-MM-DD in the doctor's time zone. */
 function nextDates(tz: string) {
@@ -19,11 +21,11 @@ function errorText(err: unknown) {
   return (err as Error).message;
 }
 
-export function BookingPanel({ doctorId }: { doctorId: string }) {
+export function BookingPanel({ doctorId, initialDate }: { doctorId: string; initialDate?: string }) {
+  const { patient } = usePatient();
   const [doctor, setDoctor] = useState<Doctor | null>(null);
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [patientId, setPatientId] = useState('');
   const [date, setDate] = useState('');
+  const [minutes, setMinutes] = useState<15 | 30>(15);
   const [slots, setSlots] = useState<SlotView[]>([]);
   const [hold, setHold] = useState<Hold | null>(null);
   const [appointment, setAppointment] = useState<Appointment | null>(null);
@@ -33,13 +35,10 @@ export function BookingPanel({ doctorId }: { doctorId: string }) {
   useEffect(() => {
     api<Doctor>(`/doctors/${doctorId}`).then((d) => {
       setDoctor(d);
-      setDate(nextDates(d.tz)[0].value);
+      const dates = nextDates(d.tz).map((x) => x.value);
+      setDate(initialDate && dates.includes(initialDate) ? initialDate : dates[0]);
     }, (e) => setMessage(errorText(e)));
-    api<{ patients: Patient[] }>('/patients?limit=20').then((r) => {
-      setPatients(r.patients);
-      setPatientId(r.patients[0]?.id ?? '');
-    }, (e) => setMessage(errorText(e)));
-  }, [doctorId]);
+  }, [doctorId, initialDate]);
 
   const loadSlots = useCallback(async () => {
     if (!date) return;
@@ -67,10 +66,19 @@ export function BookingPanel({ doctorId }: { doctorId: string }) {
     await loadSlots().catch(() => {});
   }
 
+  /** A 30-minute visit needs this slot AND the next one to be free and back to back. */
+  const bookable = (i: number) => {
+    const s = slots[i];
+    if (s.status !== 'open' || new Date(s.start).getTime() <= now) return false;
+    if (minutes === 15) return true;
+    const next = slots[i + 1];
+    return !!next && next.status === 'open' && next.start === s.end;
+  };
+
   const holdSlot = (slotId: string) =>
     act(async (key) => {
       setAppointment(null);
-      setHold(await api<Hold>('/holds', { method: 'POST', body: { slotId, patientId }, idempotencyKey: key }));
+      setHold(await api<Hold>('/holds', { method: 'POST', body: { slotId, patientId: patient!.id, durationMinutes: minutes }, idempotencyKey: key }));
     });
   const release = () =>
     act(async (key) => {
@@ -90,8 +98,10 @@ export function BookingPanel({ doctorId }: { doctorId: string }) {
 
   if (!doctor) return <p className="muted">{message ?? 'Loading…'}</p>;
   const secondsLeft = hold ? Math.max(0, Math.round((new Date(hold.expiresAt).getTime() - now) / 1000)) : 0;
-  const localTime = (iso: string) =>
-    new Intl.DateTimeFormat('en-IN', { timeZone: doctor.tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  const fmt = new Intl.DateTimeFormat('en-IN', { timeZone: doctor.tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const timeOnly = new Intl.DateTimeFormat('en-IN', { timeZone: doctor.tz, hour: '2-digit', minute: '2-digit' });
+  const span = (start: string, end: string) => `${fmt.format(new Date(start))}–${timeOnly.format(new Date(end))}`;
+  const heldIds = hold ? slots.filter((s) => s.start >= hold.start && s.end <= hold.end).map((s) => s.id) : [];
 
   return (
     <>
@@ -103,28 +113,29 @@ export function BookingPanel({ doctorId }: { doctorId: string }) {
       <section className="panel">
         <div className="controls">
           <label>
-            Patient{' '}
-            <select value={patientId} onChange={(e) => setPatientId(e.target.value)}>
-              {patients.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </label>
-          <label>
             Day{' '}
             <select value={date} onChange={(e) => setDate(e.target.value)}>
               {nextDates(doctor.tz).map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
             </select>
           </label>
+          <div className="toggle" role="group" aria-label="Visit length">
+            {([15, 30] as const).map((m) => (
+              <button key={m} className={minutes === m ? 'on' : ''} onClick={() => setMinutes(m)} disabled={!!hold}>
+                {m} min
+              </button>
+            ))}
+          </div>
         </div>
 
         {slots.length === 0 ? (
           <p className="muted">No slots this day (weekend, leave, or not materialized).</p>
         ) : (
           <div className="slots">
-            {slots.map((s) => (
+            {slots.map((s, i) => (
               <button
                 key={s.id}
-                className={`slot ${s.status}${hold?.slotId === s.id ? ' mine' : ''}`}
-                disabled={s.status !== 'open' || !!hold}
+                className={`slot ${s.status}${heldIds.includes(s.id) ? ' mine' : ''}`}
+                disabled={!bookable(i) || !!hold || !patient}
                 onClick={() => holdSlot(s.id)}
                 title={`${s.status} · ${s.start} UTC`}
               >
@@ -133,14 +144,16 @@ export function BookingPanel({ doctorId }: { doctorId: string }) {
             ))}
           </div>
         )}
-        <p className="muted small">Times in {doctor.tz}. Grey = held or booked by someone.</p>
+        <p className="muted small">
+          Times in {doctor.tz}. Grey = held, booked or past. {minutes === 30 && 'A 30-minute visit uses this slot and the next one.'}
+        </p>
       </section>
 
       {hold && (
         <section className="panel">
-          <h2>Held for you</h2>
+          <h2>Held for {patient?.name}</h2>
           <p>
-            {localTime(slots.find((s) => s.id === hold.slotId)?.start ?? hold.expiresAt)} · expires in{' '}
+            {span(hold.start, hold.end)} · expires in{' '}
             <strong>{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</strong>
           </p>
           <div className="controls">
@@ -155,8 +168,10 @@ export function BookingPanel({ doctorId }: { doctorId: string }) {
           <h2>
             Appointment <span className={appointment.status === 'confirmed' ? 'badge ok' : 'badge down'}>{appointment.status}</span>
           </h2>
-          <p>{localTime(appointment.start)} · {appointment.visitType.replace('_', ' ')}</p>
-          <p className="muted small">id {appointment.id}</p>
+          <p>{span(appointment.start, appointment.end)} · {appointment.visitType.replace('_', ' ')}</p>
+          <p className="muted small">
+            id {appointment.id} · <Link href="/me/appointments">My appointments →</Link>
+          </p>
           {appointment.status === 'confirmed' && <button onClick={cancel}>Cancel appointment</button>}
         </section>
       )}

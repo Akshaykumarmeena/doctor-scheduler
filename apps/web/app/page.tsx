@@ -10,10 +10,10 @@ export default function Home() {
         no-show slots automatically.
       </p>
       <p>
-        <Link href="/doctors">Book a doctor →</Link>
+        <Link href="/search">Find a doctor →</Link> · <Link href="/me/appointments">My appointments</Link>
       </p>
       <HealthPanel />
-      <p className="muted">Phase 2: holds, confirm, cancel, idempotency and the outbox. Search arrives in a later phase.</p>
+      <p className="muted">Phase 3: search (OpenSearch read model fed by Kafka), patient screens and 30-minute visits.</p>
     </main>
   );
 }
