@@ -136,6 +136,16 @@ async function holdComposite(
   lease: number,
   ttl: number,
 ): Promise<Hold> {
+  // Lock the base rows under the span (FOR SHARE: other 30-minute holds may share it, but a writer such as
+  // the doctor's time off waits, and we wait for it). Without this, a composite row inserted at the same moment
+  // as time off would slip past it: row locks can't protect a row that doesn't exist yet (ADR 0008).
+  await tx.query(
+    `SELECT id FROM slots
+      WHERE doctor_id = $1 AND kind = 'base'
+        AND during <@ tstzrange($2::timestamptz, $2::timestamptz + make_interval(mins => $3::int))
+      FOR SHARE`,
+    [doctorId, start, minutes],
+  );
   // The doctor must actually work the whole span: consecutive OPEN base rows covering it exactly
   // (no lunch break, leave day or blocked slot in the middle).
   const cover = await tx.query<{ covered: number; all_open: boolean }>(
