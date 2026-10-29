@@ -37,8 +37,13 @@ export async function buildApp(deps: AppDeps) {
   // One error shape for every failure: { error, message }.
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof HttpError) return reply.code(err.statusCode).send({ error: err.code, message: err.message });
-    const e = err as { validation?: unknown; message: string };
+    const e = err as { validation?: unknown; message: string; statusCode?: number; code?: string };
     if (e.validation) return reply.code(400).send({ error: 'invalid_request', message: e.message });
+    // Fastify's own client errors (empty or malformed JSON body, payload too large, ...) are the client's fault:
+    // keep their 4xx instead of turning them into a 500.
+    if (e.statusCode && e.statusCode >= 400 && e.statusCode < 500) {
+      return reply.code(e.statusCode).send({ error: 'invalid_request', message: e.message });
+    }
     req.log.error(err);
     return reply.code(500).send({ error: 'internal', message: 'Internal server error' });
   });
