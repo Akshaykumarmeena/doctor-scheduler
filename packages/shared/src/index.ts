@@ -35,7 +35,10 @@ export interface Hold {
   slotId: string;
   doctorId: string;
   patientId: string;
+  /** When the hold lapses unless renewed (the lease; heartbeats move it forward). */
   expiresAt: string;
+  /** The hard cap: heartbeats can never extend the hold past this. */
+  deadlineAt: string;
   /** The held time: 15 or 30 minutes from the chosen slot. */
   start: string;
   end: string;
@@ -128,4 +131,49 @@ export interface SearchFacets {
   specialties: string[];
   languages: string[];
   areas: { name: string; lat: number; lng: number }[];
+}
+
+// ── Phase 4: events ─────────────────────────────────────────────────────────
+
+export type NotificationKind = 'booked' | 'cancelled' | 'offer' | 'offer_expired' | 'reminder_24h' | 'reminder_1h';
+
+export interface Notification {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  appointmentId: string | null;
+  holdId: string | null;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export type WaitlistStatus = 'waiting' | 'offered' | 'booked' | 'expired' | 'cancelled';
+
+export interface WaitlistOffer {
+  holdId: string;
+  slotId: string;
+  start: string;
+  end: string;
+  expiresAt: string;
+}
+
+export interface WaitlistEntry {
+  id: string;
+  doctorId: string;
+  patientId: string;
+  /** The doctor-local day the patient wants any slot on. */
+  date: string;
+  status: WaitlistStatus;
+  offer: WaitlistOffer | null;
+  createdAt: string;
+}
+
+/** What the live-fanout worker publishes to Redis channel doctor:<id> and the SSE stream forwards. */
+export interface LiveSlotEvent {
+  doctorId: string;
+  eventType: string;
+  start: string | null;
+  end: string | null;
+  at: string;
 }
