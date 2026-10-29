@@ -1,5 +1,5 @@
 // Read-only queries. Reads may run on any connection; only writes go through the idempotent transaction.
-import type { Appointment, Doctor, Patient, SlotView } from '@ds/shared';
+import type { Appointment, Doctor, Patient, PatientAppointment, SlotView } from '@ds/shared';
 import type { Pool } from '../db.js';
 
 /** Columns for an Appointment, from `appointments a JOIN slots s ON s.id = a.slot_id`. */
@@ -17,22 +17,49 @@ export async function getDoctor(pool: Pool, id: string): Promise<Doctor | undefi
 }
 
 /**
- * Every slot on one local calendar day of the doctor. The day boundaries are computed in the doctor's tz
- * and compared as UTC ranges. An expired hold is reported as 'open' because that is what it effectively is.
+ * Every base slot on one local calendar day of the doctor. The day boundaries are computed in the doctor's tz
+ * and compared as UTC ranges. Effective status: an expired hold counts as 'open', and a base slot covered by a
+ * live composite (30-minute) hold or booking takes that composite's status.
  */
 export async function slotsForDay(pool: Pool, doctorId: string, date: string): Promise<SlotView[]> {
   const { rows } = await pool.query<SlotView>(
     `SELECT s.id, s.doctor_id AS "doctorId", lower(s.during) AS start, upper(s.during) AS "end",
-            CASE WHEN s.status = 'held' AND s.hold_expires_at < now() THEN 'open' ELSE s.status END AS status,
+            CASE
+              WHEN s.status = 'held' AND s.hold_expires_at >= now() THEN 'held'
+              WHEN s.status IN ('booked', 'blocked') THEN s.status
+              WHEN cover.status IS NOT NULL THEN cover.status
+              ELSE 'open'
+            END AS status,
             s.version,
             to_char(lower(s.during) AT TIME ZONE d.tz, 'HH24:MI') AS "localTime"
        FROM slots s
        JOIN doctors d ON d.id = s.doctor_id
+       LEFT JOIN LATERAL (
+              SELECT c.status FROM slots c
+               WHERE c.doctor_id = s.doctor_id AND c.kind = 'composite' AND c.during && s.during
+                 AND (c.status = 'booked' OR (c.status = 'held' AND c.hold_expires_at >= now()))
+               ORDER BY c.status = 'booked' DESC
+               LIMIT 1) cover ON true
       WHERE s.doctor_id = $1
+        AND s.kind = 'base'
         AND s.during && tstzrange($2::date::timestamp AT TIME ZONE d.tz,
                                   ($2::date + 1)::timestamp AT TIME ZONE d.tz)
       ORDER BY lower(s.during)`,
     [doctorId, date],
+  );
+  return rows;
+}
+
+/** A patient's appointments: upcoming first (soonest first), then past (most recent first). */
+export async function appointmentsForPatient(pool: Pool, patientId: string): Promise<PatientAppointment[]> {
+  const { rows } = await pool.query<PatientAppointment>(
+    `SELECT ${APPOINTMENT_COLUMNS},
+            d.name AS "doctorName", d.specialty, d.clinic, d.area, d.tz
+       FROM appointments a JOIN slots s ON s.id = a.slot_id JOIN doctors d ON d.id = a.doctor_id
+      WHERE a.patient_id = $1
+      ORDER BY lower(s.during) < now(), abs(extract(epoch FROM lower(s.during) - now()))
+      LIMIT 100`,
+    [patientId],
   );
   return rows;
 }

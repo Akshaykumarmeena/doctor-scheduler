@@ -3,10 +3,10 @@ import type { VisitType } from '@ds/shared';
 import type { Pool } from '../db.js';
 import { notFound } from '../errors.js';
 import { requestHash, requireKey, withIdempotency, type Tx } from '../idempotency.js';
-import { createHold, releaseHold } from '../booking/holds.js';
+import { VISIT_MINUTES, createHold, releaseHold, type VisitMinutes } from '../booking/holds.js';
 import { confirmHold } from '../booking/confirm.js';
 import { cancelAppointment } from '../booking/cancel.js';
-import { getAppointment, getDoctor, listPatients, slotsForDay } from '../booking/queries.js';
+import { appointmentsForPatient, getAppointment, getDoctor, listPatients, slotsForDay } from '../booking/queries.js';
 
 const uuid = { type: 'string', format: 'uuid' } as const;
 const idParams = { type: 'object', required: ['id'], properties: { id: uuid } } as const;
@@ -57,12 +57,21 @@ export function registerBookingRoutes(app: FastifyInstance, pool: Pool) {
     async (req) => ({ patients: await listPatients(pool, req.query.limit ?? 20) }),
   );
 
+  app.get<{ Params: { id: string } }>('/patients/:id/appointments', { schema: { params: idParams } }, async (req) => ({
+    appointments: await appointmentsForPatient(pool, req.params.id),
+  }));
+
   // ── writes (idempotent) ────────────────────────────────────────────────────
-  app.post<{ Body: { slotId: string; patientId: string } }>(
+  app.post<{ Body: { slotId: string; patientId: string; durationMinutes?: VisitMinutes } }>(
     '/holds',
     {
       schema: {
-        body: { type: 'object', required: ['slotId', 'patientId'], additionalProperties: false, properties: { slotId: uuid, patientId: uuid } },
+        body: {
+          type: 'object',
+          required: ['slotId', 'patientId'],
+          additionalProperties: false,
+          properties: { slotId: uuid, patientId: uuid, durationMinutes: { type: 'integer', enum: [...VISIT_MINUTES] } },
+        },
       },
     },
     (req, reply) => idempotent(req, reply, 201, (tx) => createHold(tx, req.body)),
