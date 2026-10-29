@@ -7,6 +7,10 @@ import { registerHealthRoutes } from './routes/health.js';
 import { registerDoctorRoutes } from './routes/doctors.js';
 import { registerBookingRoutes } from './routes/booking.js';
 import { registerSearchRoutes } from './routes/search.js';
+import { registerNotificationRoutes } from './routes/notifications.js';
+import { registerWaitlistRoutes } from './routes/waitlist.js';
+import { registerStreamRoutes } from './routes/stream.js';
+import type { LiveHub } from './live/hub.js';
 import { config } from './config.js';
 
 export interface AppDeps {
@@ -16,6 +20,8 @@ export interface AppDeps {
   /** Where search reads from; defaults to config (OPENSEARCH_URL, alias "doctors"). */
   opensearchUrl?: string;
   searchIndex?: string;
+  /** Redis subscriber for the SSE streams; without it the stream routes are not registered. */
+  hub?: LiveHub;
 }
 
 export async function buildApp(deps: AppDeps) {
@@ -44,5 +50,8 @@ export async function buildApp(deps: AppDeps) {
     opensearchUrl: deps.opensearchUrl ?? config.opensearchUrl,
     searchIndex: deps.searchIndex ?? config.searchIndex,
   });
+  registerNotificationRoutes(app, deps.pool);
+  registerWaitlistRoutes(app, deps.pool);
+  if (deps.hub) registerStreamRoutes(app, { pool: deps.pool, hub: deps.hub, webOrigin: deps.webOrigin });
   return app;
 }
