@@ -9,6 +9,8 @@
     "reindex": "tsx src/search/reindex-cli.ts"
   },
   "dependencies": {
+    "@ds/shared": "^0.0.0",
+    "ioredis": "^6.0.0",
     "kafkajs": "^2.2.4",
     "pg": "^8.23.1"
   }
