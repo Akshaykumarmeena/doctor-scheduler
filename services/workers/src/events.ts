@@ -15,6 +15,9 @@ export interface BookingEvent {
     start: string;
     end: string;
     status?: string;
+    /** appointment.cancelled only: 'doctor' when the doctor's time off cancelled it (Phase 5). */
+    cancelledBy?: 'patient' | 'doctor';
+    reason?: string;
   };
 }
 

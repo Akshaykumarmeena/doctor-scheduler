@@ -13,13 +13,18 @@ const KINDS = {
 export async function handleNotifierEvents(pool: pg.Pool, publish: Publish, messages: RawMessage[]): Promise<number> {
   let created = 0;
   for (const e of parseEvents(messages)) {
-    const spec = KINDS[e.eventType as keyof typeof KINDS];
+    let spec: { kind: 'booked' | 'cancelled'; title: string } | undefined = KINDS[e.eventType as keyof typeof KINDS];
     if (!spec) continue;
+    // Cancelled by the doctor's time off (Phase 5): say so, instead of the generic message.
+    const byDoctor = e.payload.cancelledBy === 'doctor';
+    if (spec.kind === 'cancelled' && byDoctor) spec = { kind: 'cancelled', title: 'Doctor unavailable: appointment cancelled' };
     const n = await insertNotification(pool, {
       patientId: e.payload.patientId,
       kind: spec.kind,
       title: spec.title,
-      body: await describeVisit(pool, e.doctorId, e.payload.start, e.payload.end),
+      body:
+        (await describeVisit(pool, e.doctorId, e.payload.start, e.payload.end)) +
+        (byDoctor ? `. The doctor is unavailable${e.payload.reason ? ` (${e.payload.reason})` : ''}; please book another time.` : ''),
       appointmentId: e.aggregateId,
       dedupeKey: `event:${e.eventId}:${spec.kind}`,
     });

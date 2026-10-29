@@ -24,6 +24,8 @@ screens (search, slot grid with countdown, My appointments), 30-minute visits as
 Phase 4: hold.* events, live slot updates (live-fanout → Redis → SSE), patient inbox (notifier), waitlist offers
 (waitlist-matcher holds freed slots for the next patient through booking-api, cascading), reminders,
 closed-tab hold leases (heartbeat), and per-patient overlap guards (a patient can't be in two places at once).
+Phase 5: doctor app (/doctor): week view, working hours (from tomorrow; bookings outside new hours kept and
+flagged), time off (preview, then cancel + notify; blocks slots), Done / No-show, utilization numbers (ADR 0008).
 The full plan and the "changes vs plan" log are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Invariants (do not break these)
@@ -75,7 +77,8 @@ OpenSearch http://localhost:9200
   but does not write that piece unless Akshay asks. (Phase 1: the schema review of `slots` + EXCLUDE.
   Phase 2: `services/booking-api/src/booking/confirm.ts`, the confirm transaction.
   Phase 3: `services/booking-api/src/search/query.ts`, the search query builder.
-  Phase 4: `services/workers/src/waitlist/matcher.ts`, the waitlist matcher's pick-and-offer step.)
+  Phase 4: `services/workers/src/waitlist/matcher.ts`, the waitlist matcher's pick-and-offer step.
+  Phase 5: `services/booking-api/src/doctor/time-off.ts` `addTimeOff()`, the time-off transaction.)
 - Show a plan before multi-file changes; small commits, one logical change each; never push without Akshay's OK.
 - **Ask before deviating from an approved plan**, and add every deviation to the "Changes vs plan" log in
   `docs/ROADMAP.md`. Every PR updates that log.

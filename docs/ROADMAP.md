@@ -19,8 +19,8 @@ Agreed with Akshay on 2026-10-28. One phase = one PR, merged into `main` before 
 | 1 | Foundations | merged (PR #1) | Schema review of `slots` + EXCLUDE, explain-back (review) |
 | 2 | Booking | merged (PR #2) | `confirm.ts`, the confirm transaction (C) |
 | 3 | Patient app + search + 30-minute visits | merged (PR #3) | Search query builder (C) |
-| 4 | Events | in review | Waitlist matcher: pick next + offer (C) |
-| 5 | Doctor app | planned | tbd |
+| 4 | Events | merged (PR #4) | Waitlist matcher: pick next + offer (C) |
+| 5 | Doctor app | in review | Time-off transaction (C) |
 | 6 | Engineering console | planned | tbd |
 | 7 | Demo kit | planned | tbd |
 
@@ -64,7 +64,22 @@ estimates, trade-offs.
 Newest first. Each entry: what changed from the approved plan, why, and whether Akshay approved it **before**
 (asked) or **after** (reported) the change.
 
-### Phase 4 (this PR)
+### Phase 5 (this PR)
+- **Decisions before building (asked):** 1a keep and flag bookings when hours shrink · 2a time off cancels and
+  notifies after a preview · 3 add Done / No-show · 4 slots stay 15 min · 5 mode C for the time-off transaction ·
+  6 "reviews + fair rating" stays in the backlog.
+- **Existing files changed, asked and approved before building ("ok 1-4"):** `materializer.ts` (accepts a
+  transaction) · `booking/holds.ts` (a 30-minute hold locks its base slots FOR SHARE: fixes a real race with time
+  off, proven by the race test failing 5/5 without it) · `booking/cancel.ts` (`cancelled_by = 'patient'`) ·
+  `workers/src/notifier.ts` ("Doctor unavailable" message). Also flagged: time off releases live holds in its range.
+- **Plan-vs-build check, fixed before reporting:** the templates list was missing `id`, and the time-off list
+  called its count `cancelledAppointments`; both now match the plan (`id`, `affectedAppointments`).
+- *Small, inside planned files:* `app.ts` allows PUT in CORS (for `PUT /doctors/:id/templates`); the week view's
+  slots also carry `blockedReason`, and its appointment carries `status` and `startsHere` (to draw 30-minute
+  blocks); time-off ids are bigints, so the time-off route takes a numeric id and `schedule.changed` events use the
+  doctor as their aggregate. Reported.
+
+### Phase 4 (PR #4)
 - **Added at Akshay's request (asked, approved 2026-10-29):** closed-tab leases (2-minute lease renewed by
   heartbeats under a 5-minute deadline; `POST /holds/:id/heartbeat`, `GET /patients/:id/holds`, `leaseSeconds` on
   `POST /holds`) and per-patient overlap (schema 0011: EXCLUDE on held slots by patient, `appointments.during` +

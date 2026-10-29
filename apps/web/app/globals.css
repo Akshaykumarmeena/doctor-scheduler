@@ -82,3 +82,29 @@ h2 { margin-top: 24px; }
 .badge.count { margin-left: 6px; }
 .result.read { opacity: 0.7; }
 .offer { border-color: var(--ok); }
+
+/* Phase 5: doctor app */
+.tabs { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; }
+.tabs a { text-decoration: none; padding-bottom: 2px; }
+.tabs a.on { font-weight: 700; border-bottom: 2px solid var(--fg); }
+.week { display: grid; grid-template-columns: repeat(7, minmax(110px, 1fr)); gap: 6px; overflow-x: auto; }
+.day { display: flex; flex-direction: column; gap: 3px; min-width: 110px; }
+.dayhead { font-weight: 600; font-size: 13px; }
+.cell { font-size: 12px; border: 1px solid var(--border); border-radius: 6px; padding: 3px 5px; display: flex; flex-direction: column; background: var(--panel); }
+.cell .time { font-weight: 600; }
+.cell.booked { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, var(--panel)); }
+.cell.held { border-style: dashed; }
+.cell.blocked { opacity: 0.5; }
+.cell.tall { min-height: 52px; }
+.cell.flagged { border-color: var(--down); }
+.cell.past { opacity: 0.75; }
+.cell .actions { display: flex; gap: 4px; margin-top: 2px; }
+.cell .actions button { font-size: 11px; padding: 1px 6px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.tile { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.tile .value { font-size: 20px; font-weight: 700; }
+.bars { display: flex; align-items: flex-end; gap: 4px; height: 160px; }
+.bar { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+.bar .offered { width: 100%; background: var(--border); border-radius: 4px 4px 0 0; display: flex; align-items: flex-end; }
+.bar .booked { width: 100%; background: var(--ok); border-radius: 4px 4px 0 0; }
+input[type="datetime-local"], .controls input { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--fg); }

@@ -56,7 +56,7 @@ ON CONFLICT (doctor_id, during) DO NOTHING
 `;
 
 /** Returns the number of slot rows newly inserted. */
-export async function materializeSlots(pool: Pool, opts: MaterializeOptions = {}): Promise<number> {
+export async function materializeSlots(pool: Pick<Pool, 'query'>, opts: MaterializeOptions = {}): Promise<number> {
   const { days = 14, from, doctorIds } = opts;
   const result = await pool.query(MATERIALIZE_SQL, [from ?? null, days, doctorIds ?? null]);
   return result.rowCount ?? 0;
