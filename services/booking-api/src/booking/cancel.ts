@@ -6,7 +6,7 @@ import { APPOINTMENT_COLUMNS } from './queries.js';
 /** Cancels a confirmed appointment, reopens its slot and emits appointment.cancelled, in one transaction. */
 export async function cancelAppointment(tx: Tx, appointmentId: string): Promise<Appointment> {
   const cancelled = await tx.query<{ slot_id: string }>(
-    `UPDATE appointments SET status = 'cancelled', updated_at = now()
+    `UPDATE appointments SET status = 'cancelled', cancelled_by = 'patient', updated_at = now()
       WHERE id = $1 AND status = 'confirmed'
       RETURNING slot_id`,
     [appointmentId],
