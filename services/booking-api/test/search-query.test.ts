@@ -36,9 +36,9 @@ describe('buildSearchQuery', () => {
     ]);
   });
 
-  it('ranks by relevance x log(1 + rating) and pages', () => {
+  it('ranks by relevance x log(2 + rating), never zero for an unrated doctor, and pages', () => {
     const q = buildSearchQuery({ page: 3, pageSize: 10 });
-    expect(q.query.function_score.functions[0]).toEqual({ field_value_factor: { field: 'rating', modifier: 'log1p', missing: 0 } });
+    expect(q.query.function_score.functions[0]).toEqual({ field_value_factor: { field: 'rating', modifier: 'log2p', missing: 0 } });
     expect([q.from, q.size]).toEqual([20, 10]);
   });
 });

@@ -35,10 +35,12 @@ Two field types matter:
 - **filter**: yes/no. It doesn't affect the score, and the result set is cached per segment, so it is cheap.
   Everything exact goes here.
 - **must**: scored with BM25 (rare terms and short fields weigh more). Only the fuzzy free text goes here.
-- **function_score × log1p(rating)**: a better-rated doctor edges ahead at equal relevance, but rating never beats
+- **function_score × log(2 + rating)** (`log2p`): a better-rated doctor edges ahead at equal relevance, but rating never beats
   relevance outright.
 
 `fuzziness: AUTO` allows 1–2 edits depending on word length, so "cardiolgy" and "priyaa" still match.
+The real query wraps two matchers in `bool.should` (either is enough): the fuzzy one above, plus a `bool_prefix`
+one that treats the last word as a prefix, so "cardio" finds Cardiology while you are still typing.
 
 ## 3. Kafka consumers: groups, offsets, lag
 

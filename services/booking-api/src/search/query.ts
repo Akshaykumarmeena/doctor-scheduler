@@ -42,12 +42,13 @@ export function buildSearchQuery(p: SearchParams) {
       ]
     : [{ match_all: {} }];
 
-  // Ranking: text relevance multiplied by log(1 + rating), so a 4.8 doctor edges out an equally relevant
-  // 3.2 doctor, but rating never swamps relevance.
+  // Ranking: text relevance multiplied by log(2 + rating), so a 4.8 doctor edges out an equally relevant
+  // 3.2 doctor, but rating never swamps relevance. log2p (not log1p) so an unrated doctor (0) gets
+  // log(2) instead of log(1) = 0, which would zero the score and bury them.
   const query = {
     function_score: {
       query: { bool: { must, filter } },
-      functions: [{ field_value_factor: { field: 'rating', modifier: 'log1p', missing: 0 } }],
+      functions: [{ field_value_factor: { field: 'rating', modifier: 'log2p', missing: 0 } }],
       boost_mode: 'multiply',
     },
   };

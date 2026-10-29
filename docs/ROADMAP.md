@@ -67,6 +67,8 @@ Newest first. Each entry: what changed from the approved plan, why, and whether 
 - The four "reported after" items above are small additions inside the approved scope, but under the new rule
   they should have been asked first. Akshay approved all four. The fix agreed for future phases: a strict
   definition of "deviation", stop-and-ask, and a check of the built changes against the plan before every report.
+- **Ranking uses `log2p` (log(2 + rating)) instead of `log1p`**, so an unrated doctor (rating 0) isn't scored 0 and
+  buried. Found while explaining the query to Akshay. Asked.
 - *Fixed during live verification (not scope changes):* free-text search now matches by prefix OR typo
   (`bool_prefix` + fuzzy), so search-as-you-type works ("cardio" found 0, now 332). The search-box placeholder no
   longer suggests "skin", because there are no synonyms.

@@ -25,7 +25,8 @@ ranking. That is a search-engine workload. Postgres stays the only source of tru
    Known gap: events during a rebuild land on the old index; the next event for that doctor fixes it
    (production would replay from an offset captured before the rebuild).
 5. **Query** (`buildSearchQuery`): exact constraints in `bool.filter` (unscored, cached), free text in
-   `bool.must` via `multi_match` (name^3, specialty^2, fuzziness AUTO), ranking = text score × log1p(rating).
+   `bool.must` as prefix-OR-fuzzy `multi_match` (name^3, specialty^2; `bool_prefix` for search-as-you-type,
+   fuzziness AUTO for typos), ranking = text score × log(2 + rating) (`log2p`, never 0 for unrated doctors).
    Sorts: relevance, rating, soonest, distance (only with a point).
 6. **Search failing must not break booking**: `/search` returns 503 `search_unavailable` when OpenSearch is down;
    all booking endpoints are independent of it.
