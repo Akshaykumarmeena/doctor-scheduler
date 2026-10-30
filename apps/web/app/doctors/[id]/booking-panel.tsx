@@ -162,7 +162,7 @@ export function BookingPanel({ doctorId, initialDate }: { doctorId: string; init
     <>
       <h1>{doctor.name}</h1>
       <p className="lede">
-        {doctor.specialty} · {doctor.clinic}, {doctor.area} · ★ {doctor.rating} ({doctor.ratingCount}) · {doctor.languages.join(', ')}
+        {doctor.specialty} · {doctor.clinic}, {doctor.area} · ★ {doctor.rating.toFixed(1)} {doctor.ratingCount ? `(${doctor.ratingCount})` : '· new'} · {doctor.languages.join(', ')}
       </p>
 
       <section className="panel">
