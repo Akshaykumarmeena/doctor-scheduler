@@ -26,6 +26,9 @@ Phase 4: hold.* events, live slot updates (live-fanout → Redis → SSE), patie
 closed-tab hold leases (heartbeat), and per-patient overlap guards (a patient can't be in two places at once).
 Phase 5: doctor app (/doctor): week view, working hours (from tomorrow; bookings outside new hours kept and
 flagged), time off (preview, then cancel + notify; blocks slots), Done / No-show, utilization numbers (ADR 0008).
+Phase 6: engineering console (/console) backed by a DEV-ONLY ops service (services/ops, 127.0.0.1:4100,
+OPS_ENABLED=1): service stop/start, race, live events, consumer lag, live invariants, k6 load tests with a rolling
+restart; graceful shutdown in booking-api; 2 APIs behind nginx in `npm run dev:cluster` (ADR 0009).
 The full plan and the "changes vs plan" log are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Invariants (do not break these)
@@ -65,6 +68,7 @@ The double-booking guard is the `slots_no_overlapping_commitments` EXCLUDE const
 | `npm run search:reindex` | Rebuild the OpenSearch `doctors` index from Postgres and swap the alias (run after materialize) |
 | `npm run dev` | booking-api on :4000, web on :3000, workers (relay, search-indexer, live-fanout, notifier, waitlist-matcher, reminders) |
 | `OFFER_TTL_SECONDS=60 REMINDER_LEAD_MINUTES=10,2 npm run dev` | Same, with fast waitlist offers and reminders for a demo |
+| `npm run dev:cluster` | Instead of `npm run dev`: 2 APIs behind nginx on :4000, workers, web, and the ops service on :4100 (needed for /console) |
 | `npm run demo:race [-- --naive]` | 100 patients race for one slot (API mode needs `npm run dev`) |
 | `npm run lint` / `npm run typecheck` / `npm test` | Checks; tests use a throwaway `scheduler_test` DB |
 
@@ -78,9 +82,11 @@ OpenSearch http://localhost:9200
   Phase 2: `services/booking-api/src/booking/confirm.ts`, the confirm transaction.
   Phase 3: `services/booking-api/src/search/query.ts`, the search query builder.
   Phase 4: `services/workers/src/waitlist/matcher.ts`, the waitlist matcher's pick-and-offer step.
-  Phase 5: `services/booking-api/src/doctor/time-off.ts` `addTimeOff()`, the time-off transaction.)
+  Phase 5: `services/booking-api/src/doctor/time-off.ts` `addTimeOff()`, the time-off transaction.
+  Phase 6: `services/booking-api/src/shutdown.ts` + `infra/nginx/cluster.conf`, graceful shutdown and retry policy.)
 - Show a plan before multi-file changes; small commits, one logical change each; never push without Akshay's OK.
 - **Ask before deviating from an approved plan**, and add every deviation to the "Changes vs plan" log in
   `docs/ROADMAP.md`. Every PR updates that log.
 - Plain SQL only. If a query matters, it should be readable in the code.
 - Zero spend: everything runs locally in Docker; no paid or cloud services.
+- The ops service (services/ops) is dev-only. Never expose it, never add ops endpoints to booking-api.

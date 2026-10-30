@@ -248,3 +248,62 @@ export interface DoctorStats {
   waitlistWaiting: number;
   byDay: { date: string; offeredMinutes: number; bookedMinutes: number }[];
 }
+
+// ── Phase 6: engineering console (dev-only ops service) ────────────────────
+
+export interface OpsService {
+  name: string;
+  kind: 'container' | 'process';
+  status: 'up' | 'down';
+  healthy: boolean;
+  /** false for postgres: the source of truth can't be stopped from the console. */
+  controllable: boolean;
+}
+
+export interface RaceResult {
+  mode: 'api' | 'naive';
+  racers: number;
+  slot: string;
+  /** api mode */
+  held: number;
+  rejected: number;
+  other: number;
+  /** naive mode: how many racers were told "you got it", and how often the row was overwritten */
+  naiveToldYes: number;
+  overwrites: number;
+  ms: number;
+}
+
+export interface ConsumerLag {
+  groupId: string;
+  partitions: { partition: number; committed: number; latest: number; lag: number }[];
+  totalLag: number;
+}
+
+export interface Invariants {
+  doubleBookings: number;
+  patientOverlaps: number;
+  holdsInTimeOff: number;
+  expiredHoldsNotSwept: number;
+  /** not an error by itself: events waiting for the relay */
+  outboxBacklog: number;
+  checkedAt: string;
+}
+
+export interface LoadRun {
+  runId: string;
+  status: 'running' | 'done' | 'failed';
+  vus: number;
+  durationSec: number;
+  rollingRestart: boolean;
+  startedAt: string;
+  rps: number | null;
+  p50: number | null;
+  p95: number | null;
+  p99: number | null;
+  errorRate: number | null;
+  checksPassed: number | null;
+  restartTimeline: { atSec: number; event: string }[];
+  invariantsAfter: Invariants | null;
+  error?: string;
+}

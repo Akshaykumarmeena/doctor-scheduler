@@ -80,6 +80,18 @@ services:
       retries: 30
     mem_limit: 2g
 
+  # Phase 6: load balancer for `npm run dev:cluster` (two booking-api instances on the host, :4001 and :4002).
+  # Only started with the "cluster" profile, so plain `npm run dev:infra` is unchanged.
+  lb:
+    image: nginx:1.27-alpine
+    profiles: ["cluster"]
+    ports: ["4000:80"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - ./infra/nginx/cluster.conf:/etc/nginx/cluster.conf.in:ro
+      - ./infra/nginx/resolve-api-host.sh:/docker-entrypoint.d/05-resolve-api-host.sh:ro
+    mem_limit: 64m
+
 volumes:
   pgdata:
   osdata:

@@ -7,3 +7,4 @@ coverage/
 .DS_Store
 next-env.d.ts
 *.tsbuildinfo
+loadtest/out/
