@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import type { Appointment, Doctor, PatientAppointment, WaitlistEntry } from '@ds/shared';
+import type { Appointment, Doctor, PatientAppointment, ReviewCreated, WaitlistEntry } from '@ds/shared';
 import { api, ApiFailure } from '../../api';
 import { usePatient } from '../../patient';
 
@@ -54,6 +54,14 @@ export default function MyAppointmentsPage() {
   const leave = (id: string) => run(() => api(`/waitlist/${id}`, { method: 'DELETE', idempotencyKey: key() }));
 
   const cancel = (id: string) => run(() => api<Appointment>(`/appointments/${id}/cancel`, { method: 'POST', idempotencyKey: key() }));
+  const review = (id: string, stars: number, comment: string) =>
+    run(() =>
+      api<ReviewCreated>(`/appointments/${id}/review`, {
+        method: 'POST',
+        body: { patientId: patient!.id, stars, ...(comment.trim() ? { comment } : {}) },
+        idempotencyKey: key(),
+      }),
+    );
 
   const upcoming = items?.filter((a) => new Date(a.start).getTime() >= now) ?? [];
   const past = items?.filter((a) => new Date(a.start).getTime() < now) ?? [];
@@ -98,12 +106,20 @@ export default function MyAppointmentsPage() {
       {upcoming.length > 0 && <h2>Upcoming</h2>}
       {upcoming.map((a) => <Row key={a.id} a={a} onCancel={cancel} />)}
       {past.length > 0 && <h2>Past</h2>}
-      {past.map((a) => <Row key={a.id} a={a} />)}
+      {past.map((a) => <Row key={a.id} a={a} onReview={review} />)}
     </main>
   );
 }
 
-function Row({ a, onCancel }: { a: PatientAppointment; onCancel?: (id: string) => void }) {
+function Row({
+  a,
+  onCancel,
+  onReview,
+}: {
+  a: PatientAppointment;
+  onCancel?: (id: string) => void;
+  onReview?: (id: string, stars: number, comment: string) => Promise<void>;
+}) {
   const fmt = new Intl.DateTimeFormat('en-IN', { timeZone: a.tz, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const minutes = Math.round((new Date(a.end).getTime() - new Date(a.start).getTime()) / 60_000);
   return (
@@ -115,8 +131,46 @@ function Row({ a, onCancel }: { a: PatientAppointment; onCancel?: (id: string) =
           {fmt.format(new Date(a.start))} · {minutes} min · {a.visitType.replace('_', ' ')}{' '}
           <span className={a.status === 'confirmed' ? 'badge ok' : 'badge down'}>{a.status}</span>
         </div>
+        {a.myReviewStars !== null && <div className="small">You rated this visit {'★'.repeat(a.myReviewStars)}</div>}
+        {onReview && a.status === 'completed' && a.myReviewStars === null && <RateVisit onSubmit={(s, c) => onReview(a.id, s, c)} />}
       </div>
       {onCancel && a.status === 'confirmed' && <button onClick={() => onCancel(a.id)}>Cancel</button>}
     </section>
+  );
+}
+
+/** "Rate your visit": only shown for a completed visit the patient hasn't reviewed (the API enforces both). */
+function RateVisit({ onSubmit }: { onSubmit: (stars: number, comment: string) => Promise<void> }) {
+  const [stars, setStars] = useState(0);
+  const [comment, setComment] = useState('');
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="small">
+      <strong>Rate your visit:</strong>{' '}
+      {[1, 2, 3, 4, 5].map((s) => (
+        <button key={s} className={s <= stars ? 'primary' : ''} onClick={() => setStars(s)} aria-label={`${s} stars`}>★</button>
+      ))}
+      <div className="controls" style={{ marginTop: 8 }}>
+        <input
+          className="searchbox"
+          style={{ marginBottom: 0 }}
+          maxLength={500}
+          placeholder="Comment (optional)"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+        />
+        <button
+          className="primary"
+          disabled={stars === 0 || busy}
+          onClick={async () => {
+            setBusy(true);
+            await onSubmit(stars, comment);
+            setBusy(false);
+          }}
+        >
+          Submit review
+        </button>
+      </div>
+    </div>
   );
 }

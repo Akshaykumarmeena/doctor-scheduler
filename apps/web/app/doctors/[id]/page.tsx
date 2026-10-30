@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { BookingPanel } from './booking-panel';
+import { Reviews } from './reviews';
 
 export default async function DoctorPage({
   params,
@@ -14,6 +15,7 @@ export default async function DoctorPage({
     <main>
       <p className="muted small"><Link href="/search">← Search</Link></p>
       <BookingPanel doctorId={id} initialDate={date} />
+      <Reviews doctorId={id} />
     </main>
   );
 }
