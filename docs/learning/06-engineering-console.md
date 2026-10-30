@@ -54,6 +54,29 @@ dead the whole time. Fix: resolve the IPv4 address at container start. Lesson: *
 bugs unit tests never will**, and you must read the error breakdown, not just the headline number. (It also
 surfaced a bug in the load script itself, and one in the API's error handler; see the ROADMAP log.)
 
+## 4b. The second bug: "healthy" is not "back in rotation" (found 2026-10-30)
+
+The 0% above was measured with nobody using the app. With browser tabs open, the same test showed **0.5–3.4%
+errors**. Two things combined:
+1. Every open page keeps a live-update stream (SSE). So an instance now takes the full 5 s to drain instead of
+   stopping at once.
+2. The rolling restart stopped api-2 the moment api-1 answered its health check. But nginx had marked api-1 as
+   failed while it was restarting, and only tries it again after `fail_timeout` (2 s). Inside that window api-2
+   started draining too, so nginx saw **no live upstream** and answered 502 itself (its log says exactly that).
+
+Proof by hand, same load: restart api-2 right after api-1 is healthy → 1.5% errors (a timing race: another run got
+0%); wait 4 s first → 0% and 0%. Fixed in two places (Akshay chose both):
+- **The orchestrator waits** 3 s after an instance is healthy before stopping the next (`ROTATION_SETTLE_MS` in
+  `services/ops/src/load.ts`). Kubernetes calls this `minReadySeconds`; cloud load balancers use a "healthy
+  threshold" of N good checks.
+- **nginx never marks an instance down** (`max_fails=0` in `cluster.conf`): a failure is simply retried on the
+  other one, so "no live upstreams" can't happen. The cost: a request may try a dying instance first (instant on a
+  refused connection; up to `proxy_connect_timeout` if a host hangs).
+
+After the fix, with 4 streams held open (every drain took the full 5 s): **3 runs, 0% errors, 100% checks**.
+Lessons: measure with realistic clients connected (idle-system results can lie), and a health check answers "is the
+process up?", not "is the load balancer sending it traffic?".
+
 ## 5. Consumer lag, live
 
 Lag = newest offset − committed offset. Stop OpenSearch, make a few bookings: search-indexer's lag climbs (its
