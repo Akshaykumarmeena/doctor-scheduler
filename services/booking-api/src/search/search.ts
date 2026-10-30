@@ -7,7 +7,8 @@ import { buildSearchQuery } from './query.js';
 
 interface Hit {
   _score: number | null;
-  _source: Doctor & {
+  _source: Omit<Doctor, 'ratingCount'> & {
+    rating_count?: number;
     location: { lat: number; lon: number };
     next_available: string | null;
     available_dates: string[];
@@ -48,7 +49,7 @@ export async function searchDoctors(osUrl: string, index: string, params: Search
     results: body.hits.hits.map(({ _score, _source: s }) => ({
       doctor: {
         id: s.id, name: s.name, specialty: s.specialty, clinic: s.clinic, area: s.area,
-        lat: s.location.lat, lng: s.location.lon, languages: s.languages, rating: s.rating, tz: s.tz,
+        lat: s.location.lat, lng: s.location.lon, languages: s.languages, rating: s.rating, ratingCount: s.rating_count ?? 0, tz: s.tz,
       },
       nextAvailable: s.next_available,
       availableDates: s.available_dates,

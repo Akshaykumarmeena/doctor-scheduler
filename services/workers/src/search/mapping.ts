@@ -20,6 +20,7 @@ export const DOCTORS_INDEX_BODY = {
       languages: { type: 'keyword' },
       location: { type: 'geo_point' },
       rating: { type: 'float' },
+      rating_count: { type: 'integer' }, // Phase 8: "★ 4.6 (128)"
       tz: { type: 'keyword', index: false },
       next_available: { type: 'date' },
       available_dates: { type: 'date', format: 'yyyy-MM-dd' }, // local dates with at least one free slot
@@ -38,6 +39,7 @@ export interface DoctorDocument {
   languages: string[];
   location: { lat: number; lon: number };
   rating: number;
+  rating_count: number;
   tz: string;
   next_available: string | null;
   available_dates: string[];
