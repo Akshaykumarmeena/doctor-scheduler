@@ -11,7 +11,10 @@ export interface Doctor {
   lat: number;
   lng: number;
   languages: string[];
+  /** The fair (Bayesian) rating, 1 decimal (Phase 8). */
   rating: number;
+  /** How many real reviews it is based on. */
+  ratingCount: number;
   tz: string;
 }
 
@@ -66,6 +69,8 @@ export interface PatientAppointment extends Appointment {
   clinic: string;
   area: string;
   tz: string;
+  /** The patient's own review of this visit, if they wrote one (Phase 8). */
+  myReviewStars: number | null;
 }
 
 export interface Patient {
@@ -306,4 +311,22 @@ export interface LoadRun {
   restartTimeline: { atSec: number; event: string }[];
   invariantsAfter: Invariants | null;
   error?: string;
+}
+
+// ── Phase 8: reviews ────────────────────────────────────────────────────────
+
+export interface ReviewCreated {
+  id: string;
+  stars: number;
+  comment: string | null;
+  createdAt: string;
+  doctorRating: { fair: number; count: number };
+}
+
+export interface DoctorReviews {
+  fair: number;
+  count: number;
+  /** stars -> how many reviews gave that many */
+  distribution: Record<'1' | '2' | '3' | '4' | '5', number>;
+  reviews: { stars: number; comment: string | null; createdAt: string; patientFirstName: string }[];
 }

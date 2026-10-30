@@ -24,7 +24,7 @@ export async function buildDoctorDocuments(pool: pg.Pool, doctorIds: string[] | 
      )
      SELECT d.id, d.name, d.specialty, d.clinic, d.area, d.languages,
             json_build_object('lat', d.lat, 'lon', d.lng) AS location,
-            d.rating::float AS rating, d.tz,
+            d.rating::float AS rating, d.rating_count, d.tz,
             min(a.start) AS next_available,
             coalesce(array_agg(DISTINCT to_char(a.start AT TIME ZONE d.tz, 'YYYY-MM-DD'))
                        FILTER (WHERE a.start IS NOT NULL), '{}') AS available_dates,

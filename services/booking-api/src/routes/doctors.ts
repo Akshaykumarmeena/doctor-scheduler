@@ -15,7 +15,7 @@ export function registerDoctorRoutes(app: FastifyInstance, pool: Pool) {
     },
     async (req) => {
       const { rows } = await pool.query<Doctor>(
-        `SELECT id, name, specialty, clinic, area, lat, lng, languages, rating, tz
+        `SELECT id, name, specialty, clinic, area, lat, lng, languages, rating::float AS rating, rating_count AS "ratingCount", tz
            FROM doctors
           ORDER BY name, id
           LIMIT $1`,

@@ -96,8 +96,16 @@ cheap with 304s (ETag/version), jitter, backoff, slower polling in background ta
 Bookings are kept and flagged; only open slots close (from tomorrow). Never silently drop a patient.
 
 **How do you rank doctors fairly by rating?**
-A Bayesian average, (C·m + Σstars)/(C + n): few reviews pull toward the platform mean, many reviews dominate.
-(Phase 8.)
+A Bayesian average, (C·prior + Σstars)/(C + n), C = 20: few reviews stay near the prior (the doctor's starting
+rating, or the platform mean), many reviews dominate. 2 × 5★ from a 4.0 prior → 4.1; 800 reviews at 4.7 → 4.7.
+Only the patient of a completed visit may review, once. It's recomputed in the review's own transaction with one
+`UPDATE` on the doctor row (stored count and sum), so concurrent reviews can't lose an update, and an outbox event
+refreshes search. (Phase 8, ADR 0011.)
+
+**Two reviews for the same doctor arrive at the same moment. Can one be lost?**
+No. Both run `UPDATE doctors SET rating_count = rating_count + 1, rating_sum = rating_sum + stars …`. The second
+waits for the first's row lock, then re-reads the committed row before applying its own change. A read-then-write
+in application code (read the average, compute, write it back) would lose one. Tested with 10 concurrent reviews.
 
 **What happens if a user closes the tab mid-booking?**
 The hold's 2-minute lease stops being renewed by heartbeats, so it lapses and the slot frees up within about 2

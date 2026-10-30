@@ -10,7 +10,8 @@ export const APPOINTMENT_COLUMNS = `
 
 export async function getDoctor(pool: Pool, id: string): Promise<Doctor | undefined> {
   const { rows } = await pool.query<Doctor>(
-    'SELECT id, name, specialty, clinic, area, lat, lng, languages, rating, tz FROM doctors WHERE id = $1',
+    `SELECT id, name, specialty, clinic, area, lat, lng, languages, rating::float AS rating, rating_count AS "ratingCount", tz
+       FROM doctors WHERE id = $1`,
     [id],
   );
   return rows[0];
@@ -54,8 +55,9 @@ export async function slotsForDay(pool: Pool, doctorId: string, date: string): P
 export async function appointmentsForPatient(pool: Pool, patientId: string): Promise<PatientAppointment[]> {
   const { rows } = await pool.query<PatientAppointment>(
     `SELECT ${APPOINTMENT_COLUMNS},
-            d.name AS "doctorName", d.specialty, d.clinic, d.area, d.tz
+            d.name AS "doctorName", d.specialty, d.clinic, d.area, d.tz, r.stars AS "myReviewStars"
        FROM appointments a JOIN slots s ON s.id = a.slot_id JOIN doctors d ON d.id = a.doctor_id
+       LEFT JOIN reviews r ON r.appointment_id = a.id
       WHERE a.patient_id = $1
       ORDER BY lower(s.during) < now(), abs(extract(epoch FROM lower(s.during) - now()))
       LIMIT 100`,

@@ -33,6 +33,9 @@ Phase 7: demo kit: `npm run demo` (cluster + production web + Cloudflare quick t
 same-origin via /api; console local-only; per-visitor rate limit), `npm run demo:reset`, docs/demo/DEMO-SCRIPT.md,
 interview pack in docs/interview/ (ADR 0010). Live updates use apps/web/app/live.tsx: SSE push with a heartbeat,
 falling back to 1-second polling when a proxy (the free tunnel) blocks the stream.
+Phase 8: reviews + fair rating: one review per completed visit (by its patient), Bayesian rating
+(20 × prior + Σstars) / (20 + n) recomputed in the review's transaction, `doctor.rating_changed` refreshes
+search (ADR 0011).
 The full plan and the "changes vs plan" log are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Invariants (do not break these)
@@ -89,7 +92,8 @@ OpenSearch http://localhost:9200
   Phase 3: `services/booking-api/src/search/query.ts`, the search query builder.
   Phase 4: `services/workers/src/waitlist/matcher.ts`, the waitlist matcher's pick-and-offer step.
   Phase 5: `services/booking-api/src/doctor/time-off.ts` `addTimeOff()`, the time-off transaction.
-  Phase 6: `services/booking-api/src/shutdown.ts` + `infra/nginx/cluster.conf`, graceful shutdown and retry policy.)
+  Phase 6: `services/booking-api/src/shutdown.ts` + `infra/nginx/cluster.conf`, graceful shutdown and retry policy.
+  Phase 8: `services/booking-api/src/reviews.ts` `createReview()`, the review checks + Bayesian recompute.)
 - Show a plan before multi-file changes; small commits, one logical change each; never push without Akshay's OK.
 - **Ask before deviating from an approved plan**, and add every deviation to the "Changes vs plan" log in
   `docs/ROADMAP.md`. Every PR updates that log.
