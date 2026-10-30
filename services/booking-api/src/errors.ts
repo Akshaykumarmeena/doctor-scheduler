@@ -13,3 +13,4 @@ export const badRequest = (code: string, message: string) => new HttpError(400, 
 export const notFound = (code: string, message: string) => new HttpError(404, code, message);
 export const conflict = (code: string, message: string) => new HttpError(409, code, message);
 export const unprocessable = (code: string, message: string) => new HttpError(422, code, message);
+export const forbidden = (code: string, message: string) => new HttpError(403, code, message);

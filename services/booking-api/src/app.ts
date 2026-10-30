@@ -11,6 +11,7 @@ import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerWaitlistRoutes } from './routes/waitlist.js';
 import { registerStreamRoutes } from './routes/stream.js';
 import { registerDoctorAppRoutes } from './routes/doctor.js';
+import { registerReviewRoutes } from './routes/reviews.js';
 import type { LiveHub } from './live/hub.js';
 import { config } from './config.js';
 
@@ -59,6 +60,7 @@ export async function buildApp(deps: AppDeps) {
   registerNotificationRoutes(app, deps.pool);
   registerWaitlistRoutes(app, deps.pool);
   registerDoctorAppRoutes(app, deps.pool);
+  registerReviewRoutes(app, deps.pool);
   if (deps.hub) registerStreamRoutes(app, { pool: deps.pool, hub: deps.hub, webOrigin: deps.webOrigin });
   return app;
 }
