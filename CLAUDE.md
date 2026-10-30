@@ -36,6 +36,8 @@ falling back to 1-second polling when a proxy (the free tunnel) blocks the strea
 Phase 8: reviews + fair rating: one review per completed visit (by its patient), Bayesian rating
 (20 × prior + Σstars) / (20 + n) recomputed in the review's transaction, `doctor.rating_changed` refreshes
 search (ADR 0011).
+Phase 9: container images for later hosting (`apps/web/Dockerfile`, `infra/docker/backend.Dockerfile`, a cloud nginx
+template); hosting itself was skipped: the demo stays on the laptop + tunnel.
 The full plan and the "changes vs plan" log are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Invariants (do not break these)
