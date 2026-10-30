@@ -1,0 +1,55 @@
+# Cloud variant of infra/nginx/cluster.conf, written for Railway (Phase 9; hosting skipped, kept for later).
+# AKSHAY'S PIECE (mode B, to do later): fill in the three ___ blanks. Until then this file is a template only.
+# What stays the same as on the laptop: the retry policy and the rate limit numbers.
+# What changes between laptop and cloud: how nginx FINDS the APIs, and how it knows WHO the visitor is.
+
+# Railway's private DNS. Names can point to a new address after a redeploy, so look them up again every 10 s
+# instead of once at start (the laptop version didn't need this: the Mac's address never changes).
+resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=on;
+
+upstream booking_api {
+  zone booking_api 64k; # shared memory: required for `resolve`
+  # BLANK 1 + 2: the two API services by their private Railway names, port 4000, with `resolve` and the same
+  # failure rule as on the laptop (one failure marks an instance as down for 2 s).
+  # Hint: a Railway service called "api-1" is reachable inside the project as  api-1.railway.internal
+  server ___ resolve max_fails=1 fail_timeout=2s;
+  server ___ resolve max_fails=1 fail_timeout=2s;
+  keepalive 32;
+}
+
+# PUBLIC RATE LIMIT. On the laptop the visitor's IP came from Cloudflare's CF-Connecting-IP. Here a visitor's
+# request goes: browser → Railway's edge → web (Next.js /api rewrite) → this nginx. Railway's edge and Next.js both
+# add the visitor's IP to the X-Forwarded-For header ("visitor, proxy1, …"); its FIRST entry is the visitor.
+# BLANK 3: the variable holding that header (nginx exposes request headers as $http_<name, lower case, - as _>).
+# Requests without it (the waitlist matcher calling the API from inside Railway) get an empty key: not limited.
+map ___ $public_visitor {
+  ""                 "";
+  "~^(?<first>[^,]+)" $first;
+}
+limit_req_zone $public_visitor zone=public_visitors:10m rate=10r/s;
+limit_req_status 429;
+
+server {
+  listen 80;
+  listen [::]:80;
+
+  location / {
+    limit_req zone=public_visitors burst=20 nodelay;
+    proxy_pass http://booking_api;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+
+    # RETRY POLICY, unchanged from Phase 6 (see infra/nginx/cluster.conf for the full reasoning): a refused
+    # connection, a timeout or a 502/503 goes to the other instance; POST is retried too, safe ONLY because every
+    # write carries an Idempotency-Key.
+    proxy_next_upstream error timeout http_502 http_503 non_idempotent;
+    proxy_next_upstream_tries 2;
+    proxy_next_upstream_timeout 10s;
+    proxy_connect_timeout 2s;
+
+    # Server-Sent Events: don't buffer, and keep long-lived streams open.
+    proxy_buffering off;
+    proxy_read_timeout 1h;
+  }
+}

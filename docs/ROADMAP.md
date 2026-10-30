@@ -23,8 +23,8 @@ Agreed with Akshay on 2026-10-28. One phase = one PR, merged into `main` before 
 | 5 | Doctor app | merged (PR #5) | Time-off transaction (C) |
 | 6 | Engineering console | merged (PR #6) | Graceful shutdown + retry policy (C) |
 | 7 | Demo kit | merged (PR #7) | Capacity estimates (B: Akshay does the math) |
-| 8 | Reviews + fair rating | in progress | `reviews.ts` `createReview()`: checks + Bayesian recompute (C) |
-| 9 | Deployable on Railway: the FULL stack incl. OpenSearch + Redpanda (no lite mode) | planned (after Phase 8) | tbd |
+| 8 | Reviews + fair rating | merged (PR #8) | `reviews.ts` `createReview()`: checks + Bayesian recompute (C) |
+| 9 | Container images (hosting skipped: the demo stays on the laptop + tunnel) | in progress | nginx cloud template (B, blanks left for later) |
 
 ### 1. Foundations (done)
 Docker Compose (Postgres, Redis, Redpanda + Console, OpenSearch), numbered SQL schema with the
@@ -62,7 +62,27 @@ estimates, trade-offs.
 Newest first. Each entry: what changed from the approved plan, why, and whether Akshay approved it **before**
 (asked) or **after** (reported) the change.
 
-### Phase 8 (this PR)
+### Phase 9 (this PR)
+- **Plan approved (2026-10-30):** the full stack on Railway (11 services, Mili's workspace), D1 a (2 APIs + nginx),
+  D2 a (tsx at runtime), D3 a (console local only), D4 seed once, D5 b (Claude runs the CLI after Akshay logs in),
+  D6 (nginx template B, Dockerfiles C), "zero spend" rule to be relaxed for Mili's workspace.
+- **Changed before any hosting work (asked):** Mili's Railway is no longer available; a personal trial allows only
+  5 services and $5. Options sent (own Hobby plan, Oracle Always Free VM, trial dry run, tunnel only).
+  **Decision (Akshay): no hosting; the demo stays on the laptop + Cloudflare tunnel. Phase 9 stops after the
+  Dockerfiles and the nginx template, kept for later.** The "zero spend" rule stays unchanged. No Railway command
+  was run; no ADR (no hosting decision to record).
+- **Built:** `apps/web/Dockerfile` (the `/api` target is a build argument: Next bakes rewrites in at build time),
+  `infra/docker/backend.Dockerfile` (one image for booking-api, workers and the jobs: asked, "1a"), `.dockerignore`,
+  `infra/docker/nginx/` (cloud nginx: re-resolves names every 10 s, rate limit keyed by the first X-Forwarded-For
+  entry; Akshay's 3 blanks left for later). Folder `infra/railway/` renamed to `infra/docker/` (asked).
+  Small code changes the images need, defaults unchanged: `server.ts` listen host from `HOST`; web `start` uses
+  `PORT`/`HOST`.
+- **Verified locally:** both images build (web 1.2 GB, backend 578 MB); the backend image on the compose network
+  runs migrations ("schema up to date"), serves `/health` 200 and search, and starts all 6 worker loops; the web
+  image proxies `/api` and serves pages while listening on `::`; the nginx template (filled in a scratch copy only)
+  starts, proxies `/health` and rate-limits per visitor (40 rapid requests → 34 × 200, 6 × 429; no header → never).
+
+### Phase 8 (PR #8)
 - **Plan (asked, 2026-10-30):** separate PR · C = 20 · mode C · schema 0013 (reviews; doctors.rating_count,
   rating_sum) · only the patient of a completed visit, once, no edits · recompute in the same transaction · outbox
   `doctor.rating_changed` · `POST /appointments/:id/review` and `GET /doctors/:id/reviews` · web: rate form, doctor

@@ -25,4 +25,5 @@ const shutdown = gracefulShutdown(app, {
 process.on('SIGINT', () => void shutdown('SIGINT'));
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
-await app.listen({ port: config.port, host: '0.0.0.0' });
+// HOST=:: on IPv6-only container networks (some hosts' private networks are; :: accepts IPv4 too).
+await app.listen({ port: config.port, host: process.env.HOST ?? '0.0.0.0' });
