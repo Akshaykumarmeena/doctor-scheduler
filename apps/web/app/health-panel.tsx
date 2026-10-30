@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { DependencyName, HealthReport } from '@ds/shared';
+import { API_URL } from './api';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const POLL_MS = 5000;
 const LABELS: Record<DependencyName, string> = {
   postgres: 'Postgres',

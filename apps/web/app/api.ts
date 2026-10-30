@@ -1,6 +1,8 @@
 import type { ApiError } from '@ds/shared';
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+// Same origin: the browser calls /api/..., and Next.js forwards it to booking-api (next.config.ts). That way the app
+// also works through a public tunnel, where "localhost:4000" would mean the VISITOR's machine.
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api';
 
 export class ApiFailure extends Error {
   constructor(

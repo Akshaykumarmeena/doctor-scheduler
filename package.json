@@ -19,6 +19,8 @@
     "search:reindex": "npm run reindex -w @ds/workers",
     "dev": "concurrently -n api,web,workers -c blue,green,magenta \"npm run dev -w @ds/booking-api\" \"npm run dev -w @ds/web\" \"npm run dev -w @ds/workers\"",
     "dev:cluster": "docker compose --profile cluster up -d --wait lb && concurrently -n ops,web -c yellow,green \"OPS_ENABLED=1 OPS_SUPERVISE=1 npm run dev -w @ds/ops\" \"npm run dev -w @ds/web\"",
+    "demo": "npm run build -w @ds/web && docker compose --profile cluster up -d --wait lb && concurrently -k -n ops,web,tunnel -c yellow,green,cyan \"OPS_ENABLED=1 OPS_SUPERVISE=1 npm run dev -w @ds/ops\" \"npm run start -w @ds/web\" \"docker compose --profile demo up tunnel\"",
+    "demo:reset": "tsx scripts/demo-reset.ts",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json && npm run typecheck --workspaces --if-present",
     "test": "vitest run",

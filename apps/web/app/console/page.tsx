@@ -27,7 +27,32 @@ interface FeedEvent {
   occurredAt: string | null;
 }
 
+const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
+
+/**
+ * The console drives the dev-only ops service (stop Redis, restart APIs...). Over the public demo link it must do
+ * nothing: it shows a notice and never calls the ops service. (The ops service itself also only listens on
+ * 127.0.0.1, so a remote visitor couldn't reach it anyway.)
+ */
 export default function ConsolePage() {
+  const [where, setWhere] = useState<'checking' | 'local' | 'public'>('checking');
+  useEffect(() => setWhere(LOCAL_HOSTS.includes(window.location.hostname) ? 'local' : 'public'), []);
+  if (where === 'checking') return null;
+  if (where === 'public') {
+    return (
+      <main className="wide">
+        <h1>Engineering console</h1>
+        <section className="panel">
+          <p>The console is local only: it controls services on the presenter&apos;s machine.</p>
+          <p className="muted small">Everything else (search, booking, the doctor app) works on this link.</p>
+        </section>
+      </main>
+    );
+  }
+  return <Console />;
+}
+
+function Console() {
   const [services, setServices] = useState<OpsService[] | null>(null);
   const [opsDown, setOpsDown] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);

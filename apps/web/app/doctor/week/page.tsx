@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { WeekView } from '@ds/shared';
 import { api, ApiFailure, API_URL } from '../../api';
+import { LiveBadge, useLiveUpdates } from '../../live';
 import { useDoctor } from '../doctor-context';
 
 /** Monday of the week containing `d`, as YYYY-MM-DD (dates as plain calendar days). */
@@ -34,13 +35,11 @@ export default function WeekPage() {
     load().catch((e) => setMessage((e as Error).message));
   }, [load]);
 
-  // Live: any hold, booking, cancellation or schedule change for this doctor refreshes the week.
-  useEffect(() => {
-    if (!doctor) return;
-    const es = new EventSource(`${API_URL}/doctors/${doctor.id}/slots/stream`);
-    es.addEventListener('slots-changed', () => load().catch(() => {}));
-    return () => es.close();
-  }, [doctor, load]);
+  // Live: any hold, booking, cancellation or schedule change for this doctor refreshes the week (push, or a 1-second
+  // poll when a proxy blocks the stream; see live.tsx).
+  const liveMode = useLiveUpdates(doctor ? `${API_URL}/doctors/${doctor.id}/slots/stream` : null, 'slots-changed', () => {
+    load().catch(() => {});
+  });
 
   const outcome = async (id: string, what: 'complete' | 'no-show') => {
     setMessage(null);
@@ -99,7 +98,7 @@ export default function WeekPage() {
         ))}
       </div>
       <p className="muted small">
-        Times in {week?.tz}. Updates live. A kept booking outside your new hours is flagged; record Done / No-show once a visit has started.
+        Times in {week?.tz}. <LiveBadge mode={liveMode} />. A kept booking outside your new hours is flagged; record Done / No-show once a visit has started.
       </p>
     </section>
   );

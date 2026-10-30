@@ -92,6 +92,16 @@ services:
       - ./infra/nginx/resolve-api-host.sh:/docker-entrypoint.d/05-resolve-api-host.sh:ro
     mem_limit: 64m
 
+  # Phase 7: public demo link. A Cloudflare "quick tunnel" (free, no account): a random https://*.trycloudflare.com
+  # URL that forwards to the web app on :3000, and ONLY the web app (the ops service is never exposed).
+  # Started attached by `npm run demo`, so Ctrl+C closes the public link.
+  tunnel:
+    image: cloudflare/cloudflared:2024.10.0
+    profiles: ["demo"]
+    command: tunnel --no-autoupdate --url http://host.docker.internal:3000
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    mem_limit: 128m
+
 volumes:
   pgdata:
   osdata:

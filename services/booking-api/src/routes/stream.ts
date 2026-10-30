@@ -8,6 +8,11 @@ import { notFound } from '../errors.js';
 
 const idParams = { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } } as const;
 const HEARTBEAT_MS = 15_000; // keeps proxies from closing an idle connection
+// Heartbeat the BROWSER can see (comment lines like ": ping" are invisible to EventSource): plain "message" frames,
+// "hello" right after connecting and "ping" every 15 s. If a page hears neither, the stream is blocked somewhere
+// (e.g. the free Cloudflare quick tunnel) and the page falls back to polling (apps/web/app/live.ts).
+const HELLO = 'data: hello\n\n';
+const PING = ': ping\ndata: ping\n\n';
 
 async function openStream(
   req: FastifyRequest,
@@ -37,13 +42,14 @@ async function openStream(
     const frame = toFrame(message);
     if (frame) reply.raw.write(frame);
   });
-  const heartbeat = setInterval(() => reply.raw.write(': ping\n\n'), HEARTBEAT_MS);
+  const heartbeat = setInterval(() => reply.raw.write(PING), HEARTBEAT_MS);
   cleanup = () => {
     clearInterval(heartbeat);
     void unsubscribe();
   };
   if (closed) return cleanup();
   reply.raw.write(': connected\n\n');
+  reply.raw.write(HELLO);
 }
 
 export function registerStreamRoutes(app: FastifyInstance, deps: { pool: Pool; hub: LiveHub; webOrigin: string }) {
