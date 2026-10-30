@@ -22,8 +22,8 @@ Agreed with Akshay on 2026-10-28. One phase = one PR, merged into `main` before 
 | 4 | Events | merged (PR #4) | Waitlist matcher: pick next + offer (C) |
 | 5 | Doctor app | merged (PR #5) | Time-off transaction (C) |
 | 6 | Engineering console | merged (PR #6) | Graceful shutdown + retry policy (C) |
-| 7 | Demo kit | in progress | Capacity estimates (B: Akshay does the math) |
-| 8 | Reviews + fair rating | planned (requested 2026-10-30; separate PR, C = 20) | Bayesian rating (C) |
+| 7 | Demo kit | merged (PR #7) | Capacity estimates (B: Akshay does the math) |
+| 8 | Reviews + fair rating | in progress | `reviews.ts` `createReview()`: checks + Bayesian recompute (C) |
 | 9 | Deployable on Railway: the FULL stack incl. OpenSearch + Redpanda (no lite mode) | planned (after Phase 8) | tbd |
 
 ### 1. Foundations (done)
@@ -55,18 +55,33 @@ estimates, trade-offs.
 
 ## Backlog (not yet scheduled)
 
-- **Reviews + fair rating** (added 2026-10-29 at Akshay's request; phase to be decided). A reviews table that only
-  accepts a review for a completed appointment (one per appointment). `doctors.rating_avg` / `rating_count` are
-  updated in the same transaction, with an outbox event `doctor.rating_changed` that the search indexer already
-  handles (it re-reads the doctor). Ranking uses a Bayesian average, `(C·m + Σstars) / (C + n)`, so a 5.0 from
-  2 reviews doesn't beat a 4.7 from 800, and new doctors start at the global mean.
+- *(Reviews + fair rating moved to Phase 8.)*
 
 ## Changes vs plan
 
 Newest first. Each entry: what changed from the approved plan, why, and whether Akshay approved it **before**
 (asked) or **after** (reported) the change.
 
-### Phase 7 (this PR)
+### Phase 8 (this PR)
+- **Plan (asked, 2026-10-30):** separate PR · C = 20 · mode C · schema 0013 (reviews; doctors.rating_count,
+  rating_sum) · only the patient of a completed visit, once, no edits · recompute in the same transaction · outbox
+  `doctor.rating_changed` · `POST /appointments/:id/review` and `GET /doctors/:id/reviews` · web: rate form, doctor
+  page reviews, "★ 4.6 (128)" in search · tests · docs.
+- **Asked before building:** `patientId` in the review body + 403 when it isn't the visit's patient (there is no
+  login; same as holds and the waitlist). Approved ("a").
+- **Asked while building, approved before commit ("ok all"):** `doctors.rating_prior` column (the seeded rating,
+  captured on the first review) instead of one platform-wide prior · `myReviewStars` on `GET /patients/:id/appointments`
+  · `ratingCount` on Doctor objects (`/doctors`, `/doctors/:id`, search results) · `rating_count` in the search
+  mapping (needs a zero-downtime reindex).
+- **Found while building, approved before commit:** `scripts/demo-reset.ts` deletes reviews before appointments (foreign key)
+  and resets ratings to the seeded ones. Without it `npm run demo:reset` fails. `errors.ts` gains a `forbidden`
+  (403) helper. `getDoctor` and `/doctors` now return `rating` as a number (it was a numeric string, despite the
+  `Doctor` type).
+- **Not code:** the local web dev server never applied Phase 7's `/api` rewrite (Next reloaded the config in place),
+  so `/api/*` returned 404 on localhost:3000 until `npm run dev:cluster` was restarted. `npm run demo` (production
+  build) was never affected.
+
+### Phase 7 (PR #7)
 - **Decisions before building (asked):** Cloudflare quick tunnel via Docker · same-origin `/api` proxy · console
   local-only + per-visitor rate limit (10/s, burst 20) · `npm run demo` + `npm run demo:reset` · capacity
   estimates as Akshay's piece in mode B · "reviews + fair rating" to be done now (as Phase 8; packaging asked).

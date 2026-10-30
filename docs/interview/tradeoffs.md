@@ -21,6 +21,7 @@ Each line: what we chose, what we didn't, why, and what changes at scale. Detail
 | Patient overlap (0007) | EXCLUDE by patient | app-level checks | exact in one DB | **breaks when sharded by doctor**: needs a per-patient check (patient-schedule table sharded by patient, or a saga) |
 | Schedule changes (0008) | one transaction; keep and flag on hours change; preview then cancel and notify on time off | silent drops / async cleanup | never surprise a patient; atomic | same |
 | Deploys (0009) | graceful drain + LB retry | stop-and-restart | zero failed requests (measured) | orchestrator rolling updates + readiness probes |
+| Fair rating (0011) | Bayesian average, C = 20, recomputed in the review's transaction | a plain average / a nightly batch | few reviews can't swing the rank; always consistent with the reviews; O(1) with stored count and sum | same per shard (review, doctor and event share `doctor_id`); cache the platform mean |
 | Public demo (0010) | quick tunnel + same-origin proxy + per-visitor rate limit | exposing ports / a cloud deploy | free, temporary, nothing else exposed | real hosting, auth, WAF |
 
 ## The two trade-offs to volunteer in an interview

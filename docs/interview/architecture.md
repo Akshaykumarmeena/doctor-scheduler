@@ -38,6 +38,8 @@ flowchart LR
 | Downstream handles duplicates | dedupe keys / rebuild from the truth | notifier, indexer, matcher |
 | Abandoned holds free up | lease + heartbeat under a deadline; sweeper | `holds.ts`, `hold-sweeper.ts` |
 | Doctor schedule changes are atomic | one transaction: rules, slots, bookings, events | `doctor/hours.ts`, `doctor/time-off.ts` |
+| One review per completed visit, by its patient | `reviews.appointment_id` UNIQUE + `FOR UPDATE` on the appointment | `reviews.ts` (0013) |
+| A rating counts every review exactly once | one `UPDATE` on the doctor row (row lock) in the review's transaction | `reviews.ts` |
 | Deploys don't fail requests | graceful drain + LB retry (safe thanks to idempotency) | `shutdown.ts`, `cluster.conf` |
 
 ## Read path vs write path
