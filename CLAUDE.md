@@ -29,12 +29,16 @@ flagged), time off (preview, then cancel + notify; blocks slots), Done / No-show
 Phase 6: engineering console (/console) backed by a DEV-ONLY ops service (services/ops, 127.0.0.1:4100,
 OPS_ENABLED=1): service stop/start, race, live events, consumer lag, live invariants, k6 load tests with a rolling
 restart; graceful shutdown in booking-api; 2 APIs behind nginx in `npm run dev:cluster` (ADR 0009).
+Phase 7: demo kit: `npm run demo` (cluster + production web + Cloudflare quick tunnel; web calls the API
+same-origin via /api; console local-only; per-visitor rate limit), `npm run demo:reset`, docs/demo/DEMO-SCRIPT.md,
+interview pack in docs/interview/ (ADR 0010). Live updates use apps/web/app/live.tsx: SSE push with a heartbeat,
+falling back to 1-second polling when a proxy (the free tunnel) blocks the stream.
 The full plan and the "changes vs plan" log are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Invariants (do not break these)
 
 1. **The booking API is the only writer of `slots`.** Workers, web and scripts never update slot status directly.
-   (Exceptions: the seed script and the materializer, which only insert `open` rows. The hold sweeper runs
+   (Exceptions: the seed script and the materializer, which only insert `open` rows, and `npm run demo:reset`. The hold sweeper runs
    inside booking-api for this reason. `scripts/race.ts --naive` breaks it on purpose and resets.)
 2. **Every write is idempotent.** Mutating endpoints take an `Idempotency-Key` header; the stored response in
    `idempotency_keys` is replayed on retry; `appointments.idempotency_key` is UNIQUE.
@@ -69,6 +73,8 @@ The double-booking guard is the `slots_no_overlapping_commitments` EXCLUDE const
 | `npm run dev` | booking-api on :4000, web on :3000, workers (relay, search-indexer, live-fanout, notifier, waitlist-matcher, reminders) |
 | `OFFER_TTL_SECONDS=60 REMINDER_LEAD_MINUTES=10,2 npm run dev` | Same, with fast waitlist offers and reminders for a demo |
 | `npm run dev:cluster` | Instead of `npm run dev`: 2 APIs behind nginx on :4000, workers, web, and the ops service on :4100 (needed for /console) |
+| `npm run demo` | Cluster + production web build + public Cloudflare link (Ctrl+C closes it). See docs/demo/DEMO-SCRIPT.md |
+| `npm run demo:reset` | Wipe demo bookings/inbox/waitlist/time off, re-materialize, 2 known bookings, rebuild search |
 | `npm run demo:race [-- --naive]` | 100 patients race for one slot (API mode needs `npm run dev`) |
 | `npm run lint` / `npm run typecheck` / `npm test` | Checks; tests use a throwaway `scheduler_test` DB |
 

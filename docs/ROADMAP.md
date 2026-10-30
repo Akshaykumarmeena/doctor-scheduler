@@ -21,8 +21,10 @@ Agreed with Akshay on 2026-10-28. One phase = one PR, merged into `main` before 
 | 3 | Patient app + search + 30-minute visits | merged (PR #3) | Search query builder (C) |
 | 4 | Events | merged (PR #4) | Waitlist matcher: pick next + offer (C) |
 | 5 | Doctor app | merged (PR #5) | Time-off transaction (C) |
-| 6 | Engineering console | in review | Graceful shutdown + retry policy (C) |
-| 7 | Demo kit | planned | tbd |
+| 6 | Engineering console | merged (PR #6) | Graceful shutdown + retry policy (C) |
+| 7 | Demo kit | in progress | Capacity estimates (B: Akshay does the math) |
+| 8 | Reviews + fair rating | planned (requested 2026-10-30; separate PR, C = 20) | Bayesian rating (C) |
+| 9 | Deployable on Railway: the FULL stack incl. OpenSearch + Redpanda (no lite mode) | planned (after Phase 8) | tbd |
 
 ### 1. Foundations (done)
 Docker Compose (Postgres, Redis, Redpanda + Console, OpenSearch), numbered SQL schema with the
@@ -64,7 +66,25 @@ estimates, trade-offs.
 Newest first. Each entry: what changed from the approved plan, why, and whether Akshay approved it **before**
 (asked) or **after** (reported) the change.
 
-### Phase 6 (this PR)
+### Phase 7 (this PR)
+- **Decisions before building (asked):** Cloudflare quick tunnel via Docker · same-origin `/api` proxy · console
+  local-only + per-visitor rate limit (10/s, burst 20) · `npm run demo` + `npm run demo:reset` · capacity
+  estimates as Akshay's piece in mode B · "reviews + fair rating" to be done now (as Phase 8; packaging asked).
+- **Inside the plan, reported:** the `/api` change touched 4 files, not the 6 listed (the other files already used
+  the shared `API_URL`; `health-panel.tsx` had its own copy, covered by "anything that builds an API URL"). The
+  cloudflared image is ~92 MB, not the ~30 MB estimated.
+- **Found while testing the public link:** Next.js gzip buffered the proxied SSE streams → `compress: false` in
+  `next.config.ts` (a planned file). Then: **Cloudflare quick tunnels don't stream SSE at all** (proven with a tunnel
+  straight to nginx). Options sent to Akshay: polling fallback / named tunnel / accept. **Decision: 1-second polling fallback**
+  (asked). Built as planned: `stream.ts` sends browser-visible "hello"/"ping" messages (plain data frames, so the
+  existing stream test is unchanged), new `apps/web/app/live.tsx` (push → heartbeat watch → 1 s polling → retry push),
+  used by the slot grid, the doctor's week and the inbox badge. New test `stream-heartbeat.test.ts`. Measured
+  through the tunnel: 469 ms from a confirmed hold to the polling page showing it.
+
+- **Order decided (Akshay, 2026-10-30):** Phase 8 reviews first, then Phase 9 Railway with the full stack (OpenSearch
+  and Redpanda included: "if we don't show OpenSearch, what's the point"). The "lite mode" idea is dropped.
+
+### Phase 6 (PR #6)
 - **Decisions before building (asked):** separate dev-only ops service · k6 via Docker (`grafana/k6:0.54.0`) ·
   cluster setup (2 APIs + nginx, `npm run dev:cluster`, graceful shutdown in `server.ts`) · mode C for graceful
   shutdown + retry policy · no extra console wishes.
