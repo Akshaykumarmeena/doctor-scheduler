@@ -1,7 +1,7 @@
 // npm run demo:reset: put the local demo back into a known state before an interview.
 //
-// It DELETES all appointments, notifications, waitlist entries, idempotency keys, outbox rows and demo time off
-// (the seeded "Personal leave" days stay), releases every hold and reopens slots booked or closed for time off.
+// It DELETES all appointments, reviews (ratings go back to the seeded ones), notifications, waitlist entries,
+// idempotency keys, outbox rows and demo time off (the seeded "Personal leave" days stay), releases every hold and reopens slots booked or closed for time off.
 // Doctors, patients and working hours are kept. Then it books two known appointments through the API and rebuilds
 // the search index. Like the seed, it writes `slots` directly: an admin script, a documented exception to
 // invariant 1. Local development data only.
@@ -33,6 +33,12 @@ async function wipe() {
     const counts = {
       reopenedSlots,
       notifications: (await client.query('DELETE FROM notifications')).rowCount, // before appointments (FK)
+      reviews: (await client.query('DELETE FROM reviews')).rowCount, // before appointments (FK)
+      ratingsReset: (
+        await client.query(
+          `UPDATE doctors SET rating = rating_prior, rating_prior = NULL, rating_count = 0, rating_sum = 0 WHERE rating_prior IS NOT NULL`,
+        )
+      ).rowCount, // back to the seeded rating
       appointments: (await client.query('DELETE FROM appointments')).rowCount,
       waitlist: (await client.query('DELETE FROM waitlist_entries')).rowCount,
       idempotencyKeys: (await client.query('DELETE FROM idempotency_keys')).rowCount,
