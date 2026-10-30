@@ -4,9 +4,10 @@
 // The choice is remembered in this browser only.
 // Phase 4: also keeps the inbox unread count live over SSE (GET /patients/:id/stream).
 import Link from 'next/link';
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Notification, Patient } from '@ds/shared';
 import { api, API_URL } from './api';
+import { useLiveUpdates } from './live';
 
 const STORAGE_KEY = 'ds.patientId';
 
@@ -57,17 +58,27 @@ export function PatientProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, [patientId]);
 
-  // Live: the server pushes "notification" events; the browser's EventSource reconnects by itself.
   useEffect(() => {
-    if (!patientId) return;
     refreshInbox();
-    const es = new EventSource(`${API_URL}/patients/${patientId}/stream`);
-    es.addEventListener('notification', () => {
-      refreshInbox();
-      setInboxVersion((v) => v + 1);
-    });
-    return () => es.close();
-  }, [patientId, refreshInbox]);
+  }, [refreshInbox]);
+
+  // Live: the server pushes "notification" events. If the stream is blocked (e.g. the public tunnel), live.tsx falls
+  // back to calling this every second; then pages only reload when the unread count actually changed.
+  const lastUnread = useRef<number | null>(null);
+  const onInboxChange = useCallback(() => {
+    if (!patientId) return;
+    api<{ unread: number }>(`/patients/${patientId}/notifications?unread=true`)
+      .then((r) => {
+        setUnread(r.unread);
+        if (lastUnread.current !== null && r.unread !== lastUnread.current) setInboxVersion((v) => v + 1);
+        lastUnread.current = r.unread;
+      })
+      .catch(() => {});
+  }, [patientId]);
+  useLiveUpdates(patientId ? `${API_URL}/patients/${patientId}/stream` : null, 'notification', (source) => {
+    onInboxChange();
+    if (source === 'push') setInboxVersion((v) => v + 1); // a poll bumps it only when the count changed
+  });
 
   const setPatientId = (id: string) => {
     setId(id);

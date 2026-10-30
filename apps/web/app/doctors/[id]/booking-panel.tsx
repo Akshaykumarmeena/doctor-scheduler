@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { Appointment, Doctor, Hold, SlotView, WaitlistEntry } from '@ds/shared';
 import { api, ApiFailure, API_URL } from '../../api';
+import { LiveBadge, useLiveUpdates } from '../../live';
 import { usePatient } from '../../patient';
 
 /** The next 14 calendar dates as YYYY-MM-DD in the doctor's time zone. */
@@ -40,7 +41,6 @@ export function BookingPanel({ doctorId, initialDate }: { doctorId: string; init
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [live, setLive] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -62,16 +62,10 @@ export function BookingPanel({ doctorId, initialDate }: { doctorId: string; init
   }, [loadSlots]);
 
   // Live: someone else holds, books or cancels on this day -> the server pushes "slots-changed" -> refetch.
-  useEffect(() => {
-    if (!date) return;
-    const es = new EventSource(`${API_URL}/doctors/${doctorId}/slots/stream?date=${date}`);
-    es.onopen = () => setLive(true);
-    es.onerror = () => setLive(false); // EventSource retries on its own
-    es.addEventListener('slots-changed', () => {
-      loadSlots().catch(() => {});
-    });
-    return () => es.close();
-  }, [doctorId, date, loadSlots]);
+  // Through a proxy that blocks streams, live.tsx falls back to refetching every second.
+  const liveMode = useLiveUpdates(date ? `${API_URL}/doctors/${doctorId}/slots/stream?date=${date}` : null, 'slots-changed', () => {
+    loadSlots().catch(() => {});
+  });
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -207,7 +201,7 @@ export function BookingPanel({ doctorId, initialDate }: { doctorId: string; init
         )}
         <p className="muted small">
           Times in {doctor.tz}. Grey = held, booked or past. {minutes === 30 && 'A 30-minute visit uses this slot and the next one.'}{' '}
-          <span title="Updates from other patients appear without reloading">{live ? '● live' : '○ connecting…'}</span>
+          <LiveBadge mode={liveMode} />
         </p>
         {nothingFree && !hold && (
           <div className="controls">
