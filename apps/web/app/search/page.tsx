@@ -128,7 +128,7 @@ export default function SearchPage() {
                 {r.doctor.specialty} · {r.doctor.clinic}, {r.doctor.area}
                 {r.distanceKm !== null && ` · ${r.distanceKm} km`}
               </div>
-              <div className="muted small">★ {r.doctor.rating} ({r.doctor.ratingCount}) · {r.doctor.languages.join(', ')}</div>
+              <div className="muted small">★ {r.doctor.rating.toFixed(1)} {r.doctor.ratingCount ? `(${r.doctor.ratingCount})` : '· new'} · {r.doctor.languages.join(', ')}</div>
             </div>
             <div className="next">
               {r.nextAvailable ? (

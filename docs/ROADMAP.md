@@ -62,7 +62,12 @@ estimates, trade-offs.
 Newest first. Each entry: what changed from the approved plan, why, and whether Akshay approved it **before**
 (asked) or **after** (reported) the change.
 
-### Phase 9 (this PR)
+### Small fix: rating label (this PR)
+- Search results and the doctor page showed "★ 5 (0)" for doctors with no reviews yet (the seeded starting rating).
+  Now: "★ 5.0 · new" with 0 reviews, "★ 4.6 (128)" otherwise; always one decimal. Asked (Akshay: "star fix ok",
+  2026-10-30). Web only: no API, schema or test changes.
+
+### Phase 9 (PR #9)
 - **Plan approved (2026-10-30):** the full stack on Railway (11 services, Mili's workspace), D1 a (2 APIs + nginx),
   D2 a (tsx at runtime), D3 a (console local only), D4 seed once, D5 b (Claude runs the CLI after Akshay logs in),
   D6 (nginx template B, Dockerfiles C), "zero spend" rule to be relaxed for Mili's workspace.
