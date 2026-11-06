@@ -12,6 +12,15 @@ import { checkInvariants } from './invariants.js';
 
 export const K6_IMAGE = 'grafana/k6:0.54.0';
 
+/**
+ * After an instance is healthy, wait this long before stopping the next one. "Healthy" means the process answers;
+ * it is not yet "back in rotation": nginx re-tries an instance it saw fail only after fail_timeout (2 s). Stopping
+ * the other instance inside that window left nginx with no live upstream (502s), measured at 0.5-3.4% errors with
+ * browser tabs open (their live-update streams make each drain take the full 5 s). Same idea as Kubernetes'
+ * minReadySeconds.
+ */
+export const ROTATION_SETTLE_MS = 3000;
+
 export interface LoadOptions {
   vus: number;
   durationSec: number;
@@ -34,7 +43,11 @@ export function loadRunner(deps: { repoRoot: string; processes: ProcessControl; 
       run.restartTimeline.push({ atSec: at(), event: `${name}: stopped, starting again` });
       await deps.processes.start(name);
       const ok = await deps.processes.waitHealthy(name);
-      run.restartTimeline.push({ atSec: at(), event: `${name}: ${ok ? 'healthy, back in rotation' : 'did NOT come back healthy'}` });
+      run.restartTimeline.push({ atSec: at(), event: `${name}: ${ok ? 'healthy' : 'did NOT come back healthy'}` });
+      if (ok && name === 'api-1') {
+        await new Promise((r) => setTimeout(r, ROTATION_SETTLE_MS));
+        run.restartTimeline.push({ atSec: at(), event: `${name}: back in rotation (waited ${ROTATION_SETTLE_MS / 1000} s for nginx)` });
+      }
     }
   }
 

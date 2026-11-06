@@ -62,6 +62,16 @@ estimates, trade-offs.
 Newest first. Each entry: what changed from the approved plan, why, and whether Akshay approved it **before**
 (asked) or **after** (reported) the change.
 
+### Fix: rolling-restart handover (this PR)
+- Found while recording the founder demo: with browser tabs open (live-update streams), the load test with a
+  rolling restart showed 0.5–3.4% errors (0% with no clients). Cause: the restart stopped api-2 as soon as api-1
+  was healthy, before nginx had put api-1 back in rotation (`fail_timeout` 2 s), so nginx had no live upstream (502).
+  Proven by hand: no gap 1.5%, 4 s gap 0%.
+- **Fix (c), chosen by Akshay (asked):** `services/ops/src/load.ts` waits 3 s after api-1 is healthy
+  (`ROTATION_SETTLE_MS`), and `infra/nginx/cluster.conf` uses `max_fails=0` (retry, never mark down). This changes
+  Akshay's Phase 6 piece; approved. Learning note: `docs/learning/06-engineering-console.md` §4b.
+- After: 3 runs with 4 streams held open → 0% errors, 100% checks. The cloud template (`infra/docker/nginx/`) still
+  says "max_fails=1" in its comments for Akshay's blanks; to align when he fills them in.
 ### Small fix: rating label (this PR)
 - Search results and the doctor page showed "★ 5 (0)" for doctors with no reviews yet (the seeded starting rating).
   Now: "★ 5.0 · new" with 0 reviews, "★ 4.6 (128)" otherwise; always one decimal. Asked (Akshay: "star fix ok",
